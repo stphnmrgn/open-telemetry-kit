@@ -3,7 +3,7 @@ from .telemetry import Telemetry
 from .packet import Packet
 from .element import Element, UnknownElement
 from .elements import TimestampElement, TimeframeBeginElement, TimeframeEndElement, DatetimeElement
-from .elements import LatitudeElement, LongitudeElement, AltitudeElement
+from .elements import LatitudeElement, LongitudeElement, AltitudeElement, PlatformHeadingAngleElement
 import open_telemetry_kit.detector as detector
 
 from datetime import timedelta
@@ -65,9 +65,11 @@ class SRTParser(Parser):
         packet = Packet()
         sec_line_beg = block.find('\n') + 1
         sec_line_end = block.find('\n', sec_line_beg)
-        self._extractTimeframe(block[sec_line_beg: sec_line_end], packet)
-        self._extractDatetime(block[sec_line_end + 1 :], packet)
-        self._extractData(block[sec_line_end + 1:], packet)
+        timeframe = block[sec_line_beg : sec_line_end]
+        data = block[sec_line_end + 1 : ]
+        self._extractTimeframe(timeframe, packet)
+        data = self._extractDatetime(data, packet)
+        self._extractData(data, packet)
         if len(packet) > 0:
           self.logger.info("Adding new packet.")
           tel.append(packet)
@@ -93,23 +95,26 @@ class SRTParser(Parser):
       # If one wasn't found either parsing failed or this file doesn't follow the standard
       self.logger.error("No timeframe was found. It is likely something went wrong with parsing")
 
-  # Example datetime
+  # Example datetimes
   # 2019-09-25 01:22:35,118,697
+  # Jun 19, 2019 4:47:39 PM
   def _extractDatetime(self, block: str, packet: Dict[str, Element]):
     # This should find any reasonably formatted (and some not so reasonably formatted) datetimes
     # Looks for:
-    # 1+ digits, '/', '-', or '.', 1+ digits, the same separator previously found
-    #   1+ digits, 1+ whitespace, 1+ digits, ':' 1+ digits,
-    #   ':', 1+ digits, '.' or ',', any amount of whitespace, any number of digits, 
-    #   the same separator previously found, any amount of whitespace, any number of digits 
-    dt = re.search(r"\d+([\/\-\.])\d+\1\d+\s+\d+:\d+:\d+([.,])?\s*\d*\2?\s*\d*", block)
+    # 1+ alphanum, [space, tab, '/', '-',  or .'], 1+ digits, [space, tab, '/', '-',  or .']       Date 
+    #   1+ digits, 1+ whitespace,                                                                  Date 
+    #   1+ digits, ':' 1+ digits, ':', 1+ digits, ['.' or ','], 0+ whitespace, 0+ digits,          Time 
+    #   the same separator previously found, 0+ whitespace, 0+ digits, period identifier           Time 
+    match = re.search(r"\w+[ \t,-/.]*\d+[ \t,-/.]*\d+[ \t]*\d+:\d+:\d+([.,])?[ \t]*\d*\1?[ \t]*\d*[ \t]*[aApPmM.]{0,2}", block)
+    # This is probably better but needs to be tested
+    # r"\d+([\/\-\.])\d+\1\d+[ \t]+\d+:\d+:\d+([.,])?[ \t]*\d*\2?[ \t]*\d*[ \t]*\[aApPmM]{0,2}"
 
     # dateutil is pretty good, but can't handle the double microsecond separator 
     # that sometimes shows up in DJIs telemetry so check to see if it exists and get rid of it
     # Also, convert to epoch microseconds while we're at it
-    if dt:
-      micro_syn = dt[2]
-      dt = dt[0]
+    if match:
+      micro_syn = match[1]
+      dt = match[0]
       if micro_syn and dt.count(micro_syn) > 1:
         #concatentate timestamp pre-2nd separator with post-2nd separator
         dt = dt[:dt.rfind(micro_syn)] + dt[dt.rfind(micro_syn)+1:]
@@ -120,6 +125,8 @@ class SRTParser(Parser):
         packet[TimestampElement.name] = TimestampElement(dt)
       else:
         packet[DatetimeElement.name] = DatetimeElement(dt)
+
+      return block[0 : match.start()] + block[match.end():]
     
     elif self.require_timestamp:
       if self.beg_timestamp != 0:
@@ -132,17 +139,40 @@ class SRTParser(Parser):
       else:
         self.logger.critical("Could not find any time elements when require_timestamp was set")
 
-  # DJI
+      return block
+
+  # Looks for telemetry of the form:
+  # Try to identify how data is formated.
+  # Known possibilities:
+  # brackets: [iso : 110] [shutter : 1/200.0] [fnum : 280] [ev : 0.7] [ct : 5064] [color_md : default] [focal_len : 240] [latitude: 0.608553] [longtitude: -1.963763] [altitude: 1429.697998]
+  # parens: F/7.1, SS 320, ISO 100, EV 0, GPS (-122.3699, 37.8166, 15), D 224.22m, H 58.20m, H.S 15.71m/s, V.S 0.10m/s 
+  # whitespace: 38.47993, -122.69943, 115.5m, 302°
+  def _extractData(self, block: str, packet: Dict[str, Element]):
+    if "GPS" in block:
+      self._extractDataParens(block, packet)
+    elif "[" in block:
+      self._extractDataBracket(block, packet)
+    else:
+      self._extractDataWhite(block, packet)
+
+    if LatitudeElement.name not in packet or  \
+       LongitudeElement.name not in packet or \
+       AltitudeElement.name not in packet:
+      self.logger.warn("No or only partial GPS data found")
+
   # Looks for GPS telemetry of the form:
+  # parens: F/7.1, SS 320, ISO 100, EV 0, GPS (-122.3699, 37.8166, 15), D 224.22m, H 58.20m, H.S 15.71m/s, V.S 0.10m/s 
+  # GPS can be in two forms
   # GPS(-122.3699,37.5929,19) BAROMETER:64.3 //(long, lat) OR
   # GPS(37.8757,-122.3061,0.0M) BAROMETER:36.9M //(lat, long)
-  def _extractGPS(self, block: str, packet: Dict[str, Element]):
+  def _extractDataParens(self, block: str, packet: Dict[str, Element]):
     gps_pos = block.find("GPS")
-    gps_end = block.find(')', gps_pos)
+    gps_start = block.find('(', gps_pos)
+    gps_end = block.find(')', gps_start)
     end_line = block.find('\n', gps_end)
 
-    val1_end = block.find(',', gps_pos)
-    val1 = block[gps_pos+3 : val1_end] 
+    val1_end = block.find(',', gps_start)
+    val1 = block[gps_start+1 : val1_end] 
     val2_end = block.find(',', val1_end + 1)
     # If there are only two values within the parentheses
     if val2_end == -1:
@@ -165,37 +195,42 @@ class SRTParser(Parser):
       bar_end = bar_pos + 9 #len("BAROMETER")
       alt = block[bar_end : end_line]
     
-    packet[AltitudeElement.name] = AltitudeElement(alt.strip(' ,():M\n'))
+    # This fails if there is no altitude within parens and no barometer value
+    # This should never fail given a "correct" file
+    if alt:
+      packet[AltitudeElement.name] = AltitudeElement(alt.strip(' ,():M\n'))
 
-  # DJI
-  # Looks for telemetry of the form:
-  # [iso : 110] [shutter : 1/200.0] [fnum : 280] [ev : 0.7] [ct : 5064] [color_md : default] [focal_len : 240] [latitude: 0.608553] [longtitude: -1.963763] [altitude: 1429.697998] 
-  def _extractData(self, block: str, packet: Dict[str, Element]):
-    if "GPS" in block:
-      self._extractGPS(block, packet)
-    else:
-      # find the first '[' and last ']'
-      data_start = block.find('[')
-      data_end = block.rfind(']')
-      data = block[data_start : data_end]
+  # brackets: [iso : 110] [shutter : 1/200.0] [fnum : 280] [ev : 0.7] [ct : 5064] [color_md : default] [focal_len : 240] [latitude: 0.608553] [longtitude: -1.963763] [altitude: 1429.697998]
+  def _extractDataBracket(self, block: str, packet: Dict[str, Element]):
+    # find the first '[' and last ']'
+    data_start = block.find('[')
+    data_end = block.rfind(']')
+    data = block[data_start : data_end]
 
-      # This will split on the common delimters found in DJIs srts and return a list
-      # List _should_ be alternating keyword, value barring nothing weird from DJI
-      # which they have proven is not a safe assumption
-      data = re.split(r"[\[\]\s:]+", data)
-      if not data[0]: #remove empty string from regex search
-        data.pop(0)
-      
-      for i in range(0, len(data), 2):
-        key = data[i]
-        if key in self.element_dict:
-          element_cls = self.element_dict[key]
-          packet[element_cls.name] = element_cls(data[i+1])
-        else:
-          self.logger.warn("Adding unknown element ({} : {})".format(key, data[i+1]))
-          packet[key] = UnknownElement(data[i+1])
+    # This will split on the common delimters found in DJIs srts and return a list
+    # List _should_ be alternating keyword, value barring nothing weird from DJI
+    # which they have proven is not a safe assumption
+    data = re.split(r"[\[\]\s:]+", data)
+    if not data[0]: #remove empty string from regex search
+      data.pop(0)
+    
+    for i in range(0, len(data), 2):
+      key = data[i]
+      if key in self.element_dict:
+        element_cls = self.element_dict[key]
+        packet[element_cls.name] = element_cls(data[i+1])
+      else:
+        self.logger.warn("Adding unknown element ({} : {})".format(key, data[i+1]))
+        packet[key] = UnknownElement(data[i+1])
 
-    if LatitudeElement.name not in packet or  \
-       LongitudeElement.name not in packet or \
-       AltitudeElement.name not in packet:
-      self.logger.warn("No or only partial GPS data found")
+  # whitespace: 38.47993, -122.69943, 115.5m, 302°
+  def _extractDataWhite(self, block: str, packet: Dict[str, Element]):
+    block = block.replace(',', '')
+    data = block.split()
+    if len(data) > 0 and len(data) <= 4:
+      packet[LatitudeElement.name] = LatitudeElement(data[0])
+      packet[LongitudeElement.name] = LongitudeElement(data[1])
+      packet[AltitudeElement.name] = AltitudeElement(data[2].strip('m'))
+      if len(data) > 3:
+        packet[PlatformHeadingAngleElement.name] = PlatformHeadingAngleElement(data[3][0:-1])
+
