@@ -148,28 +148,68 @@ class SRTParser(Parser):
   # parens: F/7.1, SS 320, ISO 100, EV 0, GPS (-122.3699, 37.8166, 15), D 224.22m, H 58.20m, H.S 15.71m/s, V.S 0.10m/s 
   # whitespace: 38.47993, -122.69943, 115.5m, 302°
   def _extractData(self, block: str, packet: Dict[str, Element]):
+    #TODO: Change this check
     if "GPS" in block:
-      self._extractDataParens(block, packet)
+      self._extractLabeledList(block, packet)
     elif "[" in block:
-      self._extractDataBracket(block, packet)
+      self._extractBracket(block, packet)
     else:
-      self._extractDataWhite(block, packet)
+      self._extractUnlabledList(block, packet)
 
     if LatitudeElement.name not in packet or  \
        LongitudeElement.name not in packet or \
        AltitudeElement.name not in packet:
       self.logger.warn("No or only partial GPS data found")
 
-  # Looks for GPS telemetry of the form:
-  # parens: F/7.1, SS 320, ISO 100, EV 0, GPS (-122.3699, 37.8166, 15), D 224.22m, H 58.20m, H.S 15.71m/s, V.S 0.10m/s 
-  # GPS can be in two forms
-  # GPS(-122.3699,37.5929,19) BAROMETER:64.3 //(long, lat) OR
-  # GPS(37.8757,-122.3061,0.0M) BAROMETER:36.9M //(lat, long)
-  def _extractDataParens(self, block: str, packet: Dict[str, Element]):
-    gps_pos = block.find("GPS")
-    gps_start = block.find('(', gps_pos)
+  # Looks for telemetry of the form:
+  # F/7.1, SS 320, ISO 100, EV 0, GPS (-122.3699, 37.8166, 15), D 224.22m, H 58.20m, H.S 15.71m/s, V.S 0.10m/s 
+  # OR
+  # HOME(-122.1505,37.4245) 2019.07.06 19:05:07 //Note: timestamp will be removed by this point
+  # GPS(-122.1509,37.4242,16) BAROMETER:80.0
+  # ISO:110 Shutter:120 EV: 0 Fnum:F2.8
+  def _extractLabeledList(self, block: str, packet: Dict[str, Element]):
+    # Make single line. Dealing with excess whitespace later
+    block = block.replace('\r', ' ')
+    block = block.replace('\n', ' ')
+    nonword = r"\W"
+    numeric = r"[\d\.]+"
+    while len(block) > 0:
+      match = re.search(nonword, block)
+      label = block[0:match.start()]
+      if label in ["GPS", "HOME"]:
+        block = self._extractGPS(block, packet)
+      else:
+        match = re.search(numeric, block)
+        val = match[0]
+        if label in self.element_dict:
+          packet[self.element_dict[label].name] = self.element_dict[label](val)
+        else:
+          self.logger.warn("Adding unknown element ({} : {})".format(label, val))
+          packet[label] = UnknownElement(val)
+        
+        block = block[match.end()+1: ].lstrip()
+
+  # Input can be:
+  # HOME(-121.1505,37.4245)[...]
+  # GPS (-122.3699, 37.8166, 15)[...]
+  # GPS(-122.3699,37.5929,19) BAROMETER:64.3[...] //(long, lat) OR
+  # GPS(37.8757,-122.3061,0.0M) BAROMETER:36.9M[...] //(lat, long)
+  def _extractGPS(self, block: str, packet: Dict[str, Element]):
+    gps_start = block.find('(')
     gps_end = block.find(')', gps_start)
-    end_line = block.find('\n', gps_end)
+    # end_line = block.find('\n', gps_end)
+
+    coord = re.compile(r"[-\d\.]+")
+    coords = coord.findall(block, gps_start, gps_end)
+
+    if len(coords) == 2 or block[gps_end - 1] == 'M':
+      packet[LatitudeElement.name] = LatitudeElement(coords[0])
+      packet[LongitudeElement.name] = LongitudeElement(coords[1])
+    #long, lat
+    else:
+      packet[LongitudeElement.name] = LongitudeElement(coords[0])
+      packet[LatitudeElement.name] = LatitudeElement(coords[1])
+
 
     val1_end = block.find(',', gps_start)
     val1 = block[gps_start+1 : val1_end] 
@@ -201,7 +241,7 @@ class SRTParser(Parser):
       packet[AltitudeElement.name] = AltitudeElement(alt.strip(' ,():M\n'))
 
   # brackets: [iso : 110] [shutter : 1/200.0] [fnum : 280] [ev : 0.7] [ct : 5064] [color_md : default] [focal_len : 240] [latitude: 0.608553] [longtitude: -1.963763] [altitude: 1429.697998]
-  def _extractDataBracket(self, block: str, packet: Dict[str, Element]):
+  def _extractBracket(self, block: str, packet: Dict[str, Element]):
     # find the first '[' and last ']'
     data_start = block.find('[')
     data_end = block.rfind(']')
@@ -224,9 +264,8 @@ class SRTParser(Parser):
         packet[key] = UnknownElement(data[i+1])
 
   # whitespace: 38.47993, -122.69943, 115.5m, 302°
-  def _extractDataWhite(self, block: str, packet: Dict[str, Element]):
-    block = block.replace(',', '')
-    data = block.split()
+  def _extractUnlabledList(self, block: str, packet: Dict[str, Element]):
+    data = block.split(", ")
     if len(data) > 0 and len(data) <= 4:
       packet[LatitudeElement.name] = LatitudeElement(data[0])
       packet[LongitudeElement.name] = LongitudeElement(data[1])
