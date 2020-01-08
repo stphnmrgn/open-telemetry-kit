@@ -196,6 +196,7 @@ class SRTParser(Parser):
   # GPS(37.8757,-122.3061,0.0M) BAROMETER:36.9M[...] //(lat, long)
   def _extractGPS(self, block: str, packet: Dict[str, Element]):
     gps_start = block.find('(')
+    label = block[0:gps_start]
     gps_end = block.find(')', gps_start)
     # end_line = block.find('\n', gps_end)
 
@@ -203,8 +204,9 @@ class SRTParser(Parser):
     coords = coord.findall(block, gps_start, gps_end)
 
     if len(coords) == 2 or block[gps_end - 1] == 'M':
-      packet[LatitudeElement.name] = LatitudeElement(coords[0])
-      packet[LongitudeElement.name] = LongitudeElement(coords[1])
+      if label == "GPS":
+        packet[LatitudeElement.name] = LatitudeElement(coords[0])
+        packet[LongitudeElement.name] = LongitudeElement(coords[1])
     #long, lat
     else:
       packet[LongitudeElement.name] = LongitudeElement(coords[0])
