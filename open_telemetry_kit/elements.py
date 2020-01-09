@@ -30,7 +30,7 @@ class TimestampElement(FloatElement, IntMISB):
 
   # Python returns a float value in seconds for timestamp so conform to that 
   def __init__(self, value: float):
-    super.__init__(value)
+    super().__init__(value)
     self.state = self._state_code[0]
 
   @classmethod
