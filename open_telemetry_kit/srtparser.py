@@ -106,8 +106,6 @@ class SRTParser(Parser):
     #   1+ digits, ':' 1+ digits, ':', 1+ digits, ['.' or ','], 0+ whitespace, 0+ digits,          Time 
     #   the same separator previously found, 0+ whitespace, 0+ digits, period identifier           Time 
     match = re.search(r"\w+[ \t,-/.]*\d+[ \t,-/.]*\d+[ \t]*\d+:\d+:\d+([.,])?[ \t]*\d*\1?[ \t]*\d*[ \t]*[aApPmM.]{0,2}", block)
-    # This is probably better but needs to be tested
-    # r"\d+([\/\-\.])\d+\1\d+[ \t]+\d+:\d+:\d+([.,])?[ \t]*\d*\2?[ \t]*\d*[ \t]*\[aApPmM]{0,2}"
 
     # dateutil is pretty good, but can't handle the double microsecond separator 
     # that sometimes shows up in DJIs telemetry so check to see if it exists and get rid of it
@@ -141,15 +139,14 @@ class SRTParser(Parser):
 
       return block
 
-  # Looks for telemetry of the form:
   # Try to identify how data is formated.
-  # Known possibilities:
-  # brackets: [iso : 110] [shutter : 1/200.0] [fnum : 280] [ev : 0.7] [ct : 5064] [color_md : default] [focal_len : 240] [latitude: 0.608553] [longtitude: -1.963763] [altitude: 1429.697998]
-  # parens: F/7.1, SS 320, ISO 100, EV 0, GPS (-122.3699, 37.8166, 15), D 224.22m, H 58.20m, H.S 15.71m/s, V.S 0.10m/s 
-  # whitespace: 38.47993, -122.69943, 115.5m, 302°
+  # See respective methods for exampls of each data format
   def _extractData(self, block: str, packet: Dict[str, Element]):
-    #TODO: Change this check
-    if "GPS" in block:
+    # Make single line. Dealing with excess whitespace later
+    # block = block.replace('\r', ' ')
+    # block = block.replace('\n', ' ')
+    block = block.lstrip()
+    if block[0].isalpha():
       self._extractLabeledList(block, packet)
     elif "[" in block:
       self._extractBracket(block, packet)
@@ -164,22 +161,26 @@ class SRTParser(Parser):
   # Looks for telemetry of the form:
   # F/7.1, SS 320, ISO 100, EV 0, GPS (-122.3699, 37.8166, 15), D 224.22m, H 58.20m, H.S 15.71m/s, V.S 0.10m/s 
   # OR
-  # HOME(-122.1505,37.4245) 2019.07.06 19:05:07 //Note: timestamp will be removed by this point
+  # HOME(-122.1505,37.4245) 2019.07.06 19:05:07 //Note: timestamp and newlines will be removed by this point
   # GPS(-122.1509,37.4242,16) BAROMETER:80.0
   # ISO:110 Shutter:120 EV: 0 Fnum:F2.8
   def _extractLabeledList(self, block: str, packet: Dict[str, Element]):
-    # Make single line. Dealing with excess whitespace later
-    block = block.replace('\r', ' ')
-    block = block.replace('\n', ' ')
-    nonword = r"\W"
-    numeric = r"[\d\.]+"
-    while len(block) > 0:
-      match = re.search(nonword, block)
-      label = block[0:match.start()]
+    block = block.replace(',', ' ')
+    separator = re.compile(r"[/ :\(]")
+    numeric = re.compile(r"[\d\.]+")
+    space = re.compile(r"\s+")
+    lbl_idx = 0
+    val_idx = 0
+    end = 0
+    while lbl_idx < len(block):
+      match = separator.search(block, lbl_idx)
+      val_idx = match.start()
+      label = block[lbl_idx:val_idx]
       if label in ["GPS", "HOME"]:
-        block = self._extractGPS(block, packet)
+        end = self._extractGPS(block, lbl_idx, packet)
       else:
-        match = re.search(numeric, block)
+        match = numeric.search(block, val_idx)
+        end = match.end()
         val = match[0]
         if label in self.element_dict:
           packet[self.element_dict[label].name] = self.element_dict[label](val)
@@ -187,60 +188,56 @@ class SRTParser(Parser):
           self.logger.warn("Adding unknown element ({} : {})".format(label, val))
           packet[label] = UnknownElement(val)
         
-        block = block[match.end()+1: ].lstrip()
+      match = space.search(block, end)
+      lbl_idx = match.end()
 
   # Input can be:
   # HOME(-121.1505,37.4245)[...]
   # GPS (-122.3699, 37.8166, 15)[...]
   # GPS(-122.3699,37.5929,19) BAROMETER:64.3[...] //(long, lat) OR
   # GPS(37.8757,-122.3061,0.0M) BAROMETER:36.9M[...] //(lat, long)
-  def _extractGPS(self, block: str, packet: Dict[str, Element]):
-    gps_start = block.find('(')
-    label = block[0:gps_start]
+  def _extractGPS(self, block: str, start: int, packet: Dict[str, Element]):
+    gps_start = block.find('(', start)
+    label = block[start:gps_start].strip()
     gps_end = block.find(')', gps_start)
     # end_line = block.find('\n', gps_end)
 
     coord = re.compile(r"[-\d\.]+")
     coords = coord.findall(block, gps_start, gps_end)
 
-    if len(coords) == 2 or block[gps_end - 1] == 'M':
-      if label == "GPS":
+    if label == "GPS":
+      if block[gps_end - 1] == 'M':
         packet[LatitudeElement.name] = LatitudeElement(coords[0])
         packet[LongitudeElement.name] = LongitudeElement(coords[1])
-    #long, lat
-    else:
-      packet[LongitudeElement.name] = LongitudeElement(coords[0])
-      packet[LatitudeElement.name] = LatitudeElement(coords[1])
+      #long, lat
+      else:
+        packet[LongitudeElement.name] = LongitudeElement(coords[0])
+        packet[LatitudeElement.name] = LatitudeElement(coords[1])
 
+      alt = None
+      if len(coords) == 3:
+        alt = coords[2]
 
-    val1_end = block.find(',', gps_start)
-    val1 = block[gps_start+1 : val1_end] 
-    val2_end = block.find(',', val1_end + 1)
-    # If there are only two values within the parentheses
-    if val2_end == -1:
-      val2_end = gps_end 
-    val2 = block[val1_end : val2_end]
-    # lat, long
-    if 'M' == block[gps_end - 1]:
-      packet[LatitudeElement.name] = LatitudeElement(val1.strip(" ,()"))
-      packet[LongitudeElement.name] = LongitudeElement(val2.strip(" ,()"))
-    #long, lat
-    else:
-      packet[LongitudeElement.name] = LatitudeElement(val1.strip(" ,()"))
-      packet[LatitudeElement.name] = LongitudeElement(val2.strip(" ,()"))
-
-    alt = block[val2_end : gps_end]
-
-    # Favor BAROMETER measurement over altitude measurement
-    bar_pos = block.find("BAROMETER", gps_pos, end_line)
-    if bar_pos > 0:
-      bar_end = bar_pos + 9 #len("BAROMETER")
-      alt = block[bar_end : end_line]
+      # Favor BAROMETER measurement over altitude measurement
+      bar_pos = block.find("BAROMETER", gps_end)
+      if bar_pos > 0:
+        match = coord.search(block, bar_pos)
+        alt = match[0]
+        gps_end = match.end()
     
-    # This fails if there is no altitude within parens and no barometer value
-    # This should never fail given a "correct" file
-    if alt:
-      packet[AltitudeElement.name] = AltitudeElement(alt.strip(' ,():M\n'))
+      # This fails if there is no altitude within parens and no barometer value
+      # This should never fail given a "correct" file
+      if alt:
+        packet[AltitudeElement.name] = AltitudeElement(alt.strip(' ,():M\n'))
+
+    else: #label == "HOME"
+      #TODO: add home GPS elements
+      pass
+
+    return gps_end
+    # next_label = re.compile(r"\w")
+    # match = next_label.search(block, gps_end)
+    # return match.start()
 
   # brackets: [iso : 110] [shutter : 1/200.0] [fnum : 280] [ev : 0.7] [ct : 5064] [color_md : default] [focal_len : 240] [latitude: 0.608553] [longtitude: -1.963763] [altitude: 1429.697998]
   def _extractBracket(self, block: str, packet: Dict[str, Element]):
@@ -267,11 +264,10 @@ class SRTParser(Parser):
 
   # whitespace: 38.47993, -122.69943, 115.5m, 302°
   def _extractUnlabledList(self, block: str, packet: Dict[str, Element]):
-    data = block.split(", ")
+    data = block.strip().split(", ")
     if len(data) > 0 and len(data) <= 4:
       packet[LatitudeElement.name] = LatitudeElement(data[0])
       packet[LongitudeElement.name] = LongitudeElement(data[1])
       packet[AltitudeElement.name] = AltitudeElement(data[2].strip('m'))
       if len(data) > 3:
         packet[PlatformHeadingAngleElement.name] = PlatformHeadingAngleElement(data[3][0:-1])
-
