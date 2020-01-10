@@ -225,7 +225,7 @@ class AltitudeElement(FloatElement, FloatMISB):
   name = "altitude"
   names = {"Altitude", "altitude", "sensorTrueAltitude", "SensorTrueAltitude",
            "sensortruealtitude", "Sensor True Altitude", "sensor true altitude",
-           "ALT", "Alt", "alt", "Altitude (m)", "ele"}
+           "ALT", "Alt", "alt", "Altitude (m)", "ele", "BAROMETER"}
 
   misb_name = "Sensor True Altitude"
   misb_key = "06 0E 2B 34 01 01 01 01 07 01 02 01 02 02 00 00"
@@ -806,7 +806,7 @@ class PlatformAngleofAttackElement(FloatElement, FloatMISB):
 
 class PlatformVerticalSpeedElement(FloatElement, FloatMISB):
   name = "platformVerticalSpeed"
-  names = {"platformVerticalSpeed"}
+  names = {"platformVerticalSpeed", "V.S"}
 
   misb_name = "Platform Vertical Speed"
   misb_key = "06 0E 2B 34 01 01 01 01 0E 01 01 01 03 00 00 00"
@@ -861,9 +861,9 @@ class RelativeHumidityElement(FloatElement, FloatMISB):
   _domain = (0, 2**8 - 1)
   _range = (0, 100)
 
-class PlatformGroundSpeedElement(IntElement, IntMISB):
+class PlatformGroundSpeedElement(FloatElement, IntMISB):
   name = "platformGroundSpeed"
-  names = {"platformGroundSpeed"}
+  names = {"platformGroundSpeed", "H.S"}
 
   misb_name = "Platform Ground Speed"
   misb_key = "06 0E 2B 34 01 01 01 01 0E 01 01 01 05 00 00 00"
@@ -2019,29 +2019,61 @@ class WaypointListElement(Element, MISB0601):
 
     return cls(waypoints)
 
-#TODO: Make sure we can just use the base init here
 class ApertureElement(FloatElement):
   name = "aperture"
   names = {"aperture", "Aperture", "f", "F", "fnum", "Fnum"}
 
-class ShutterSpeedElement(IntElement):
+  def __init__(self, value: float):
+    super().__init__(value)
+    try:
+      if self.value >= 100:
+        self.value /= 100
+    except Exception:
+      # If init failed to convert to float, just leave as is
+      pass
+
+class ShutterSpeedElement(StrElement):
+  # Even though this is a number it is often represented as "1/###".
+  # There's no real way to know whether a given value without "1/" should actually have that or not
   name = "shutterSpeed"
   names = {"shutterSpeed", "ShutterSpeed", "shutter", "Shutter", "ss", "SS"}
-
-  def __init__(self, value: int):
-    if isinstance(value, str):
-      if value.find("1/") > 0:
-        value.replace("1/", "")
-    super().__init__(value)
 
 class ISOElement(IntElement):
   name = "ISO"
   names = {"ISO", "iso"}
 
-class EVElement(IntElement):
+class EVElement(FloatElement):
   name = "EV"
   names = {"ev", "EV", "exposurevalue", "ExposureValue", "exposure value", "Exposure Value"}
 
 class ColorTemperature(IntElement):
   name = "colorTemperature"
   names = {"colorTemperature", "ColorTemperture", "ct", "CT"}
+
+class FocalLengthElement(IntElement):
+  name = "focalLength"
+  names = {"focalLength", "FocalLength", "focal_len"}
+
+class ColorProfileElement(StrElement):
+  name = "colorProfile"
+  names = {"colorProfile", "color_md"}
+
+class HomeLatitudeElement(FloatElement):
+  name = "homeLatitude"
+  names = {"homeLatitude"}
+
+class HomeLongitudeElement(FloatElement):
+  name = "homeLongitude"
+  names = {"homeLongitude"}
+
+class HomeAltitudeElement(FloatElement):
+  name = "homeAltitude"
+  names = {"homeAltitude"}
+
+class DistanceFromHomeElement(FloatElement):
+  name = "distanceFromHome"
+  names = {"distanceFromHome", "D"}
+
+class HeightAboveHomeElement(FloatElement):
+  name = "heightAboveHome"
+  names = {"heightAboveHome", "H"}
