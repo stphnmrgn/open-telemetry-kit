@@ -144,8 +144,6 @@ class SRTParser(Parser):
   # See respective methods for exampls of each data format
   def _extractData(self, block: str, packet: Dict[str, Element]):
     # Make single line. Dealing with excess whitespace later
-    # block = block.replace('\r', ' ')
-    # block = block.replace('\n', ' ')
     block = block.lstrip()
     if block[0].isalpha():
       self._extractLabeledList(block, packet)
@@ -215,22 +213,10 @@ class SRTParser(Parser):
         packet[LongitudeElement.name] = LongitudeElement(coords[0])
         packet[LatitudeElement.name] = LatitudeElement(coords[1])
 
-      alt = None
       if len(coords) == 3:
+        # If a 'BAROMETER' value exists this will get overwritten
+        # This is expected and desired behavior
         packet[AltitudeElement.name] = AltitudeElement(coords[2])
-      #   alt = coords[2]
-
-      # # Favor BAROMETER measurement over altitude measurement
-      # bar_pos = block.find("BAROMETER", gps_end)
-      # if bar_pos > 0:
-      #   match = coord.search(block, bar_pos)
-      #   alt = match[0]
-      #   gps_end = match.end()
-    
-      # # This fails if there is no altitude within parens and no barometer value
-      # # This should never fail given a "correct" file
-      # if alt:
-      #   packet[AltitudeElement.name] = AltitudeElement(alt.strip(' ,():M\n'))
 
     else: #label == "HOME"
       if block[gps_end - 1] == 'M':
@@ -246,9 +232,6 @@ class SRTParser(Parser):
       pass
 
     return gps_end
-    # next_label = re.compile(r"\w")
-    # match = next_label.search(block, gps_end)
-    # return match.start()
 
   # brackets: [iso : 110] [shutter : 1/200.0] [fnum : 280] [ev : 0.7] [ct : 5064] [color_md : default] [focal_len : 240] [latitude: 0.608553] [longtitude: -1.963763] [altitude: 1429.697998]
   def _extractBracket(self, block: str, packet: Dict[str, Element]):
