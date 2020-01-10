@@ -229,7 +229,6 @@ class SRTParser(Parser):
 
       if len(coords) == 3:
         packet[HomeAltitudeElement.name] = HomeAltitudeElement(coords[2])
-      pass
 
     return gps_end
 
