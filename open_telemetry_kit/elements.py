@@ -2018,3 +2018,30 @@ class WaypointListElement(Element, MISB0601):
       waypoints.append(waypoint)
 
     return cls(waypoints)
+
+#TODO: Make sure we can just use the base init here
+class ApertureElement(FloatElement):
+  name = "aperture"
+  names = {"aperture", "Aperture", "f", "F", "fnum", "Fnum"}
+
+class ShutterSpeedElement(IntElement):
+  name = "shutterSpeed"
+  names = {"shutterSpeed", "ShutterSpeed", "shutter", "Shutter", "ss", "SS"}
+
+  def __init__(self, value: int):
+    if isinstance(value, str):
+      if value.find("1/") > 0:
+        value.replace("1/", "")
+    super().__init__(value)
+
+class ISOElement(IntElement):
+  name = "ISO"
+  names = {"ISO", "iso"}
+
+class EVElement(IntElement):
+  name = "EV"
+  names = {"ev", "EV", "exposurevalue", "ExposureValue", "exposure value", "Exposure Value"}
+
+class ColorTemperature(IntElement):
+  name = "colorTemperature"
+  names = {"colorTemperature", "ColorTemperture", "ct", "CT"}
