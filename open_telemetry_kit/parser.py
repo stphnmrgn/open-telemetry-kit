@@ -11,9 +11,10 @@ class Parser(metaclass=ABCMeta):
     self.convert_to_epoch = convert_to_epoch
     self.require_timestamp = require_timestamp
     self.element_dict = {}
-    for cls in Element.__subclasses__():
-      for name in cls.names:
-        self.element_dict[name] = cls
+    for subcls in Element.__subclasses__():
+      for el in subcls.__subclasses__():
+        for name in el.names:
+          self.element_dict[name] = el
 
   def __str__(self) -> str:
     return "{}('{}')".format(self.__class__.__name__, self.source)

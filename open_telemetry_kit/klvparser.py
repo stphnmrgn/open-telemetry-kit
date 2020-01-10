@@ -4,7 +4,7 @@ from .packet import Packet
 from .element import UnknownElement
 # from .elements import LatitudeElement, LongitudeElement, AltitudeElement
 from .elements import TimestampElement, ChecksumElement
-from .misb_0601 import MISB_0601
+from .misb_0601 import MISB0601
 from .detector import read_video_metadata, read_klv
 from .klv_common import bytes_to_int
 
@@ -28,7 +28,7 @@ class KLVParser(Parser):
     self.use_misb_name = use_misb_name
     self.logger = logging.getLogger("OTK.KLVParser")
     self.element_dict = {}
-    self._build_dict(MISB_0601)
+    self._build_dict(MISB0601)
 
   def _build_dict(self, cls):
     for subcls in cls.__subclasses__():
