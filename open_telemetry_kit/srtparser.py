@@ -204,8 +204,13 @@ class SRTParser(Parser):
     gps_end = block.find(')', gps_start)
     # end_line = block.find('\n', gps_end)
 
-    coord = re.compile(r"[-\d\.]+")
-    coords = coord.findall(block, gps_start, gps_end)
+    # coord = re.compile(r"[-\d\.]+")
+    coord_split = r"[ ]+"
+    coords = re.split(coord_split, block[gps_start + 1 : gps_end])
+    # coords = coord.findall(block, gps_start, gps_end)
+
+    if len(coords) < 2:
+      self.logger.error("Could not find GPS coordinates where expected")
 
     if label == "GPS":
       if block[gps_end - 1] == 'M':
