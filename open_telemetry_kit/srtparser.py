@@ -63,22 +63,23 @@ class SRTParser(Parser):
     block = ""
     for line in srt:
       if line == '\n' and len(block) > 0:
-        packet = Packet()
-        sec_line_beg = block.find('\n') + 1
-        sec_line_end = block.find('\n', sec_line_beg)
-        timeframe = block[sec_line_beg : sec_line_end]
-        data = block[sec_line_end + 1 : ]
-        if timeframe:
+        try:
+          packet = Packet()
+          sec_line_beg = block.find('\n') + 1
+          sec_line_end = block.find('\n', sec_line_beg)
+          timeframe = block[sec_line_beg : sec_line_end]
+          data = block[sec_line_end + 1 : ]
           self._extractTimeframe(timeframe, packet)
-        if data:
           data = self._extractDatetime(data, packet)
-        if data:
           self._extractData(data, packet)
-        if len(packet) > 0:
-          self.logger.info("Adding new packet.")
-          tel.append(packet)
-        else:
-          self.logger.warn("No telemetry was found in block. Packet is empty, skipping.")
+          if len(packet) > 0:
+            self.logger.info("Adding new packet.")
+            tel.append(packet)
+          else:
+            self.logger.warn("No telemetry was found in block. Packet is empty, skipping.")
+        except Exception:
+          self.logger.error("There was an error parsing this srt block. Skipping and continuing...")
+
         block = ""
       elif line == '\n':
         continue
