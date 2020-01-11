@@ -68,9 +68,12 @@ class SRTParser(Parser):
         sec_line_end = block.find('\n', sec_line_beg)
         timeframe = block[sec_line_beg : sec_line_end]
         data = block[sec_line_end + 1 : ]
-        self._extractTimeframe(timeframe, packet)
-        data = self._extractDatetime(data, packet)
-        self._extractData(data, packet)
+        if timeframe:
+          self._extractTimeframe(timeframe, packet)
+        if data:
+          data = self._extractDatetime(data, packet)
+        if data:
+          self._extractData(data, packet)
         if len(packet) > 0:
           self.logger.info("Adding new packet.")
           tel.append(packet)
