@@ -63,19 +63,23 @@ class SRTParser(Parser):
     block = ""
     for line in srt:
       if line == '\n' and len(block) > 0:
-        packet = Packet()
-        sec_line_beg = block.find('\n') + 1
-        sec_line_end = block.find('\n', sec_line_beg)
-        timeframe = block[sec_line_beg : sec_line_end]
-        data = block[sec_line_end + 1 : ]
-        self._extractTimeframe(timeframe, packet)
-        data = self._extractDatetime(data, packet)
-        self._extractData(data, packet)
-        if len(packet) > 0:
-          self.logger.info("Adding new packet.")
-          tel.append(packet)
-        else:
-          self.logger.warn("No telemetry was found in block. Packet is empty, skipping.")
+        try:
+          packet = Packet()
+          sec_line_beg = block.find('\n') + 1
+          sec_line_end = block.find('\n', sec_line_beg)
+          timeframe = block[sec_line_beg : sec_line_end]
+          data = block[sec_line_end + 1 : ]
+          self._extractTimeframe(timeframe, packet)
+          data = self._extractDatetime(data, packet)
+          self._extractData(data, packet)
+          if len(packet) > 0:
+            self.logger.info("Adding new packet.")
+            tel.append(packet)
+          else:
+            self.logger.warn("No telemetry was found in block. Packet is empty, skipping.")
+        except Exception:
+          self.logger.error("There was an error parsing this srt block. Skipping and continuing...")
+
         block = ""
       elif line == '\n':
         continue
@@ -201,8 +205,13 @@ class SRTParser(Parser):
     gps_end = block.find(')', gps_start)
     # end_line = block.find('\n', gps_end)
 
-    coord = re.compile(r"[-\d\.]+")
-    coords = coord.findall(block, gps_start, gps_end)
+    # coord = re.compile(r"[-\d\.]+")
+    coord_split = r"[ ]+"
+    coords = re.split(coord_split, block[gps_start + 1 : gps_end])
+    # coords = coord.findall(block, gps_start, gps_end)
+
+    if len(coords) < 2:
+      self.logger.error("Could not find GPS coordinates where expected")
 
     if label == "GPS":
       if block[gps_end - 1] == 'M':
