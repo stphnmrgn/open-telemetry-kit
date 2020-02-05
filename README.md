@@ -92,10 +92,11 @@ Rerun the script with one of the provided commands above.
 The OTK currently supports the following forms of telemetry:
 - `.csv` files
 - `.srt` files
-- Any video file with embedded telemetry encoded as a `.srt` (e.g. video taken with some DJI drone models)
+- Most videos file with embedded telemetry encoded as a `.srt` (e.g. video taken with some DJI drone models)
 - `.gpx` files
 - `.kml` files
 - KLV/MISB embedded data
+- Open Camera `.srt`
 
 #### Output Formats
 - JSON
@@ -105,7 +106,6 @@ The OTK currently supports the following forms of telemetry:
 Planned expansions and updates for the OTK include:
 
 #### Input Formats
-- Open Camera `.srt`
 
 #### Output Formats
 - geoJSON

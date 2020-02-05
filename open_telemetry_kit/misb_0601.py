@@ -8,7 +8,7 @@ from datetime import datetime
 from dateutil import parser as dup
 from typing import Tuple
 
-class MISB_0601(metaclass=ABCMeta):
+class MISB0601(metaclass=ABCMeta):
   @classmethod
   @abstractmethod
   def fromMISB(cls, value):
@@ -38,7 +38,7 @@ class MISB_0601(metaclass=ABCMeta):
   def misb_units(cls) -> str:
     pass
 
-class MISB_int(MISB_0601):
+class IntMISB(MISB0601):
   @property
   @classmethod
   def _signed(cls) -> bool:
@@ -48,7 +48,7 @@ class MISB_int(MISB_0601):
   def fromMISB(cls, value):
     return cls(bytes_to_int(value, cls._signed))
 
-class MISB_float(MISB_0601):
+class FloatMISB(MISB0601):
   @property
   @classmethod
   @abstractmethod
@@ -77,7 +77,7 @@ class MISB_float(MISB_0601):
     else:
       return cls(bytes_to_float(value, cls._domain, cls._range))
 
-class MISB_str(MISB_0601):
+class StrMISB(MISB0601):
   @classmethod
   def fromMISB(cls, value):
     return cls(bytes_to_str(value))

@@ -2,8 +2,10 @@
 
 from abc import ABCMeta
 from abc import abstractmethod
+import logging
 from typing import Any, Set
 
+logger = logging.getLogger("OTK.Element")
 class Element(metaclass=ABCMeta):
   def __init__(self, value: Any):
     self.value = value
@@ -29,6 +31,26 @@ class Element(metaclass=ABCMeta):
 
   def toJson(self) -> Any:
     return self.value
+
+class FloatElement(Element):
+  def __init__(self, value: float):
+    try:
+      self.value = float(value)
+    except:
+      logger.error("'{}' cound not be converted to a float value, leaving as string.".format(value))
+      self.value = str(value)
+
+class IntElement(Element):
+  def __init__(self, value: int):
+    try:
+      self.value = int(value)
+    except:
+      logger.error("'{}' cound not be converted to a int value, leaving as string.".format(value))
+      self.value = str(value)
+
+class StrElement(Element):
+  def __init__(self, value: str):
+      self.value = str(value)
 
 class UnknownElement(Element):
   name = "unknown"
