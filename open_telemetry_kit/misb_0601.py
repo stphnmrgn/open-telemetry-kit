@@ -69,7 +69,8 @@ class FloatMISB(MISB0601):
   @classmethod
   def fromMISB(cls, value):
     if isinstance(cls._invalid, bytes) and value == cls._invalid:
-      c = cls(0).value = None
+      c = cls(0)
+      c.value = None
       return c
     elif cls._domain == 'IMAPB':
       l = len(value)
