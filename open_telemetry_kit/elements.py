@@ -97,7 +97,7 @@ class PlatformHeadingAngleElement(FloatElement, FloatMISB):
   name = "platformHeadingAngle"
   names = {"platformHeadingAngle", "PlatformHeadingAngle", "platformheadingangle",
            "headingAngle", "HeadingAngle", "headingangle", "Heading Angle",
-           "heading angle", "heading", "Heading", "yaw", "Yaw", "yaw(deg)"}
+           "heading angle", "heading", "Heading", "yaw", "Yaw", "yaw(deg)", "compass_heading(degrees)"}
 
   misb_name = "Platform Heading Angle"
   misb_key = "06 0E 2B 34 01 01 01 07 07 01 10 01 06 00 00 00"
@@ -124,7 +124,7 @@ class PlatformPitchAngleFullElement(FloatElement, FloatMISB):
   name = "platformPitchAngleFull"
   names = {"platformPitchAngleFull", "PlatformPitchAngleFull", "platformpitchangleFull",
            "pitchAngleFull", "PitchAngleFull", "pitchanglefull", "Pitch Angle Full", 
-           "pitch angle full", "pitch", "Pitch", "pitch(deg)"}
+           "pitch angle full", "pitch", "Pitch", "pitch(deg)", "pitch(degrees)"}
 
   misb_name = "Platform Pitch Angle (Full)"
   misb_key = "06 0E 2B 34 01 01 01 07 07 01 10 01 05 00 00 00"
@@ -152,7 +152,7 @@ class PlatformRollAngleFullElement(FloatElement, FloatMISB):
   name = "platformRollAngleFull"
   names = {"platformRollAngleFull", "PlatformRollAngleFull", "platformrollanglefull",
            "rollAngleFull", "RollAngleFull", "rollanglefull", "Roll Angle Full",
-           "roll angle full", "roll full", "Roll Full", "roll", "Roll", "roll(deg)"}
+           "roll angle full", "roll full", "Roll Full", "roll", "Roll", "roll(deg)", "roll(degrees)"}
 
   misb_name = "Platform Roll Angle (Full)"
   misb_key = "06 0E 2B 34 01 01 01 07 07 01 10 01 04 00 00 00"
@@ -225,7 +225,8 @@ class AltitudeElement(FloatElement, FloatMISB):
   name = "altitude"
   names = {"Altitude", "altitude", "sensorTrueAltitude", "SensorTrueAltitude",
            "sensortruealtitude", "Sensor True Altitude", "sensor true altitude",
-           "ALT", "Alt", "alt", "Altitude (m)", "ele", "BAROMETER", "altitude(feet)"}
+           "ALT", "Alt", "alt", "Altitude (m)", "ele", "BAROMETER", "altitude(feet)",
+           "altitude_above_seaLevel(meters)"}
 
   misb_name = "Sensor True Altitude"
   misb_key = "06 0E 2B 34 01 01 01 01 07 01 02 01 02 02 00 00"
@@ -466,7 +467,7 @@ class TimeframeEndElement(FloatElement):
 
 class SpeedElement(FloatElement, IntMISB):
   name = "speed"
-  names = {"speed", "Speed", "velocity", "Velocity", "badelf:speed", "speed(mph)"}
+  names = {"speed", "Speed", "velocity", "Velocity", "badelf:speed", "speed(mph)", "speed(m/s)"}
 
   misb_name = "Platform True Airspeed"
   misb_key = "06 0E 2B 34 01 01 01 01 0E 01 01 01 0A 00 00 00"
