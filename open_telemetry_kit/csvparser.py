@@ -46,6 +46,7 @@ class CSVParser(Parser):
                 packet[element_cls.name] = element_cls(val)
             else:
               packet[element_cls.name] = element_cls(val)
+              packet[element_cls.name].value = self.convert_to_metric(key, packet[element_cls.name].value)
 
           else:
             self.logger.warn("Adding unknown element ({} : {})".format(key, val))
@@ -65,3 +66,11 @@ class CSVParser(Parser):
     if len(tel) == 0:
       self.logger.warn("No telemetry was found. Returning empty Telemetry()")
     return tel
+
+  def convert_to_metric(self, key: str, val: float):
+    if ("feet" in key):
+      return  val * 0.3048
+    if ("mph" in key):
+      return  val * 0.44704
+    
+    return val
