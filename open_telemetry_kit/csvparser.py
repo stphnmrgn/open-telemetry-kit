@@ -23,6 +23,10 @@ class CSVParser(Parser):
     tel = Telemetry()
     with open(self.source, newline='') as csvfile:
       reader =  csv.DictReader(csvfile)
+
+      for idx, name in enumerate(reader.fieldnames):
+        reader.fieldnames[idx] = name.strip()
+
       for row in reader:
         packet = Packet()
           
