@@ -172,28 +172,35 @@ class SRTParser(Parser):
     separator = re.compile(r"[/ :\(]")
     numeric = re.compile(r"[\d\.]+")
     space = re.compile(r"\s+")
-    lbl_idx = 0
-    val_idx = 0
-    end = 0
-    while lbl_idx < len(block):
-      match = separator.search(block, lbl_idx)
-      val_idx = match.start()
-      label = block[lbl_idx:val_idx]
+    nonspace = re.compile(r"\S+")
+    lbl_start = 0
+    while lbl_start < len(block):
+      match = separator.search(block, lbl_start)
+      lbl_end = match.start()
+      sep = match.end()
+      label = block[lbl_start:lbl_end]
       if label in ["GPS", "HOME"]:
-        end = self._extractGPS(block, lbl_idx, packet)
+        end = self._extractGPS(block, lbl_start, packet)
+        match = space.search(block, end)
+        lbl_start = match.end()
       else:
-        match = numeric.search(block, val_idx)
-        end = match.end()
-        val = match[0]
-        if label in self.element_dict:
-          packet[self.element_dict[label].name] = self.element_dict[label](val)
-        else:
-          self.logger.warn("Adding unknown element ({} : {})".format(label, val))
-          packet[label] = UnknownElement(val)
+        match = nonspace.search(block, sep)
+        val_start = match.start()
+        match = space.search(block, val_start)
+        val_end = match.start()
+        lbl_start = match.end()
+        val_full = block[val_start:val_end]
+        match = numeric.search(val_full)
+        try:
+          val = match[0]
+          if label in self.element_dict:
+            packet[self.element_dict[label].name] = self.element_dict[label](val)
+          else:
+            self.logger.warn("Adding unknown element ({} : {})".format(label, val))
+            packet[label] = UnknownElement(val)
+        except:
+          self.logger.info("Could not find valid value for '{}' element".format(label))
         
-      match = space.search(block, end)
-      lbl_idx = match.end()
-
   # Input can be:
   # HOME(-121.1505,37.4245)[...]
   # GPS (-122.3699, 37.8166, 15)[...]
