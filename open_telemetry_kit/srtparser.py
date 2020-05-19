@@ -170,7 +170,7 @@ class SRTParser(Parser):
   def _extractLabeledList(self, block: str, packet: Dict[str, Element]):
     block = block.replace(',', ' ')
     separator = re.compile(r"[/ :\(]")
-    numeric = re.compile(r"[\d\.]+")
+    numeric = re.compile(r"[\d\.-]+")
     space = re.compile(r"\s+")
     nonspace = re.compile(r"\S+")
     lbl_start = 0
