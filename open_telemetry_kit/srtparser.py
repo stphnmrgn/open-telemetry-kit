@@ -254,6 +254,7 @@ class SRTParser(Parser):
     data_start = block.find('[')
     data_end = block.rfind(']')
     data = block[data_start : data_end]
+    data = data.replace(',','')
 
     # This will split on the common delimters found in DJIs srts and return a list
     # List _should_ be alternating keyword, value barring nothing weird from DJI
