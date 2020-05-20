@@ -2079,6 +2079,6 @@ class HeightAboveHomeElement(FloatElement):
   name = "heightAboveHome"
   names = {"heightAboveHome", "H"}
 
-class IsTakingVideo(IntElement):
+class IsTakingVideoElement(IntElement):
   name = "isTakingVideo"
   names = {"isTakingVideo", "isVideo"}
