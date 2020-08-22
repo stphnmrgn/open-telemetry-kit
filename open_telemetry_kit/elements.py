@@ -225,8 +225,8 @@ class AltitudeElement(FloatElement, FloatMISB):
   name = "altitude"
   names = {"Altitude", "altitude", "sensorTrueAltitude", "SensorTrueAltitude",
            "sensortruealtitude", "Sensor True Altitude", "sensor true altitude",
-           "ALT", "Alt", "alt", "Altitude (m)", "ele", "BAROMETER", "altitude(feet)",
-           "altitude_above_seaLevel(meters)"}
+           "ALT", "Alt", "alt", "Altitude (m)", "ele", "BAROMETER",
+           "altitude_above_seaLevel(meters)", "altitude_above_seaLevel(feet)"}
 
   misb_name = "Sensor True Altitude"
   misb_key = "06 0E 2B 34 01 01 01 01 07 01 02 01 02 02 00 00"
