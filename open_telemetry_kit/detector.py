@@ -32,6 +32,8 @@ def get_embedded_telemetry_type(metadata: JSONType) -> str:
         return "srt"
       elif stream["codec_type"] == "data" and stream["codec_tag_string"] == "KLVA":
         return "klv"
+      elif stream["codec_type"] == "data" and stream["tags"]["handler_name"] == "ParrotVideoMetadata":
+        return "parrot"
 
   logger.error("Unsupported embedded telemetry type.")
   return None
@@ -52,7 +54,7 @@ def get_telemetry_type(src: str) -> Tuple[str, bool]:
   if metadata:
     tel_type = get_embedded_telemetry_type(metadata)
 
-    if tel_type and tel_type in supported:
+    if tel_type:
       logger.info("Found embedded telemetry of type '{}'".format(tel_type))
       return (tel_type, True)
   
