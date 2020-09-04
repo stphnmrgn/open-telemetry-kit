@@ -78,3 +78,22 @@ class CSVParser(Parser):
       return  val * 0.44704
     
     return val
+
+  def adjust_Parrot(self, temp_csv):
+    with open(temp_csv, newline='') as csvfile:
+      reader =  csv.DictReader(csvfile, delimiter=' ')
+
+      new_headers = []
+      for name in reader.fieldnames:
+        if name == 'time':
+          new_headers.append('timeframeBegin')
+        else:
+          new_headers.append(name)
+      
+      with open(self.source, mode='w') as new_csvfile:
+        writer = csv.writer(new_csvfile, new_headers)
+        writer.writerow(new_headers)
+        # writer.writeheader()
+        for row in reader:
+          row['time'] = float(row['time'])/1000000
+          writer.writerow(row.values())

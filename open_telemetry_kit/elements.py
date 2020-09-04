@@ -17,7 +17,7 @@ class ChecksumElement(IntElement, IntMISB):
 
 class TimestampElement(FloatElement, IntMISB):
   name = "timestamp"
-  names = {"timestamp", "Timestamp", "time stamp", "Time Stamp"}
+  names = {"timestamp", "Timestamp", "time stamp", "Time Stamp", "frame_timestamp"}
 
   misb_name = "Precision Time Stamp"
   misb_key = "06 0E 2B 34 01 01 01 03 07 02 01 01 01 05 00 00"
@@ -197,7 +197,7 @@ class ImageCoordinateSystemElement(StrElement, StrMISB):
 class LatitudeElement(FloatElement, FloatMISB):
   name = "latitude"
   names = {"Latitude", "latitude", "sensorLatitude", "SensorLatitude", "sensorlatitude",
-           "Sensor Latitude", "sensor latitude", "Lat", "lat", "LATITUDE", "LAT"}
+           "Sensor Latitude", "sensor latitude", "Lat", "lat", "LATITUDE", "LAT", "location_latitude"}
 
   misb_name = "Sensor Latitude"
   misb_key = "06 0E 2B 34 01 01 01 03 07 01 02 01 02 04 02 00"
@@ -211,7 +211,7 @@ class LongitudeElement(FloatElement, FloatMISB):
   name = "longitude"
   names = {"Longitude", "longitude", "sensorLongitude", "SensorLongitude",
            "sensorlongitude", "Sensor Longitude", "sensor longitude", "Long", "long",
-           "LONG", "Lon", "lon", "LON", "longtitude"} #DJI can't spell
+           "LONG", "Lon", "lon", "LON", "longtitude", "location_longitude"} 
 
   misb_name = "Sensor Longitude"
   misb_key = "06 0E 2B 34 01 01 01 03 07 01 02 01 02 06 02 00"
@@ -225,8 +225,9 @@ class AltitudeElement(FloatElement, FloatMISB):
   name = "altitude"
   names = {"Altitude", "altitude", "sensorTrueAltitude", "SensorTrueAltitude",
            "sensortruealtitude", "Sensor True Altitude", "sensor true altitude",
-           "ALT", "Alt", "alt", "Altitude (m)", "ele", "BAROMETER", "altitude(feet)",
-           "altitude_above_seaLevel(meters)"}
+           "ALT", "Alt", "alt", "Altitude (m)", "ele", "BAROMETER",
+           "altitude_above_seaLevel(meters)", "altitude_above_seaLevel(feet)",
+           "location_altitude"}
 
   misb_name = "Sensor True Altitude"
   misb_key = "06 0E 2B 34 01 01 01 01 07 01 02 01 02 02 00 00"
@@ -265,7 +266,7 @@ class SensorHorizontalFOVElement(FloatElement, FloatMISB):
   names = {"sensorHorizontalFOV", "SensorHorizontalFOV", "sensorhorizontalfov",
            "Sensor Horizontal FOV", "sensor horizontal FOV", "sensor horizontal fov",
            "Horizontal FOV", "horizontal FOV", "horizontal fov", "Horizontal FOV (deg)",
-           "sensorHorizontalFov"}
+           "sensorHorizontalFov", "picture_hfov"}
 
   misb_name = "Sensor Horizontal Field of View"
   misb_key = "06 0E 2B 34 01 01 01 02 04 20 02 01 01 08 00 00"
@@ -279,7 +280,7 @@ class SensorVerticalFOVElement(FloatElement, FloatMISB):
   names = {"sensorVerticalFOV", "SensorVerticalFOV", "sensorverticalfov",
            "Sensor Vertical FOV", "sensor vertical FOV", "sensor vertical fov",
            "Vertical FOV", "vertical FOV", "vertical fov", "Vertical FOV (deg)",
-           "sensorVerticalFov"}
+           "sensorVerticalFov", "picture_vfov"}
 
   misb_name = "Sensor Vertical Field of View"
   misb_key = "06 0E 2B 34 01 01 01 07 04 20 02 01 01 0A 01 00"
