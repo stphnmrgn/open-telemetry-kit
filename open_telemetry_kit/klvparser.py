@@ -86,6 +86,9 @@ class KLVParser(Parser):
       if self.klv_stream.tell() + elem_len > packet_end:
         self.logger.warn("Have parsed more bytes than expected. Skipping Packet...")
         break
+      if elem_len == 0:
+        self.logger.warn("Element with 0 length detected. Skipping Packet...")
+        break
 
       value = self.klv_stream.read(elem_len)
 
