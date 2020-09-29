@@ -30,10 +30,12 @@ def get_embedded_telemetry_type(metadata: JSONType) -> str:
     for stream in metadata["streams"]:
       if stream["codec_type"] == "subtitle" and stream["codec_tag_string"] == "text":
         return "srt"
-      elif stream["codec_type"] == "data" and stream["codec_tag_string"] == "KLVA":
-        return "klv"
-      elif stream["codec_type"] == "data" and stream["tags"]["handler_name"] == "ParrotVideoMetadata":
-        return "parrot"
+      elif stream["codec_type"] == "data":
+        if "codec_tag_string" in stream and stream["codec_tag_string"] == "KLVA":
+          return "klv"
+        elif "tags" in stream and "handler_name" in stream["tags"] and \
+             stream["tags"]["handler_name"] == "ParrotVideoMetadata":
+          return "parrot"
 
   logger.error("Unsupported embedded telemetry type.")
   return None
