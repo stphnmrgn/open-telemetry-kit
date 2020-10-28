@@ -31,6 +31,8 @@ from .telemetry import Telemetry
 from .packet import Packet
 from .element import UnknownElement
 from .elements import TimestampElement, DatetimeElement
+from .elements import LatitudeElement, LongitudeElement, AltitudeElement
+from .elements import SpeedElement
 
 import datetime
 import io
@@ -60,12 +62,6 @@ class BlackvueParser(Parser):
       fd.seek(0, io.SEEK_END)
       eof = fd.tell()
       fd.seek(0)
-      date = None
-
-      first_gps_date = None
-      first_gps_time = None
-      found_first_gps_date = False
-      found_first_gps_time = False
 
     while fd.tell() < eof:
       try:
@@ -89,7 +85,12 @@ class BlackvueParser(Parser):
             timestamp = None
             packet = None
             for l in lines.splitlines():
+              m = l.lstrip('[]0123456789')
+              if not m:
+                continue
+
               match = re.search('\[([0-9]+)\]', l)
+              # If new timestamp found
               if match and match.group(1) != timestamp:
                 if packet:
                   tel.append(packet)
@@ -97,104 +98,21 @@ class BlackvueParser(Parser):
                 timestamp = match.group(1)
                 packet[TimestampElement.name] = TimestampElement(float(timestamp) * 1e-3)
 
-              m = l.lstrip('[]0123456789')
-             ###############################################################################
-             ############################################################################### 
-              #By default, use camera timestamp. Only use GPS Timestamp if camera was not set up correctly and date/time is wrong
-              # if using camera ts - only use GPGGA info with exception of GPRMC as possible first data point
-              # If not using camera tx (ie using GPS ts) - use both GPGGA and GPRMC
-              # Why tho...
-              if use_nmea_stream_timestamp==False:
-                if "$GPGGA" in m:
-                  match = re.search('\[([0-9]+)\]', l)
-                  if match:
-                    epoch_in_local_time = match.group(1)
+              #remove timestamp on tail if it exists
+              try:
+                m = m[:m.rindex('[')]
+              except:
+                pass
 
-                  camera_date=datetime.datetime.utcfromtimestamp(int(epoch_in_local_time)/1000.0)
-                  data = pynmea2.parse(m)
-                  if(data.is_valid):
-                    if  found_first_gps_time == False:
-                      first_gps_time = data.timestamp
-                      found_first_gps_time = True
-                    lat, lon, alt = data.latitude, data.longitude, data.altitude
-                    points.append((camera_date, lat, lon, alt))
-
-              if use_nmea_stream_timestamp==True or found_first_gps_date==False:
-                if "GPRMC" in m:
-                  try:
-                    data = pynmea2.parse(m)
-                    if data.is_valid:
-                      date = data.datetime.date()
-                      if found_first_gps_date == False:
-                        first_gps_date=date
-                  except pynmea2.ChecksumError as e:
-                    # There are often Checksum errors in the GPS stream, better not to show errors to user
-                    pass
-                  except Exception as e:
-                    print(
-                      "Warning: Error in parsing gps trace to extract date information, nmea parsing failed")
-              if use_nmea_stream_timestamp==True:
-                if "$GPGGA" in m:
-                  try:
-                    data = pynmea2.parse(m)
-                    if(data.is_valid):
-                      lat, lon, alt = data.latitude, data.longitude, data.altitude
-                      if not date:
-                        timestamp = data.timestamp
-                      else:
-                        timestamp = datetime.datetime.combine(
-                        date, data.timestamp)
-                      points.append((timestamp, lat, lon, alt))
-
-                  except Exception as e:
-                    print(
-                      "Error in parsing gps trace to extract time and gps information, nmea parsing failed due to {}".format(e))
-            
-            #If there are no points after parsing just return empty vector
-            if points == []:
-              return []
-            #After parsing all points, fix timedate issues
-            if use_nmea_stream_timestamp==False:
-              # If we use the camera timestamp, we need to get the timezone offset, since Mapillary backend expects UTC timestamps
-              first_gps_timestamp = datetime.datetime.combine(first_gps_date, first_gps_time)
-              delta_t = points[0][0]-first_gps_timestamp
-              if delta_t.days>0:
-                hours_diff_to_utc = round(delta_t.total_seconds()/3600)
-              else:
-                hours_diff_to_utc = round(delta_t.total_seconds()/3600) * -1
-              utc_points=[]
-              for idx, point in enumerate(points):
-                delay_compensation = datetime.timedelta(seconds=-1.8) #Compensate for solution age when location gets timestamped by camera clock. Value is empirical from various cameras/recordings
-                new_timestamp = points[idx][0]+datetime.timedelta(hours=hours_diff_to_utc)+delay_compensation
-                lat = points[idx][1]
-                lon = points[idx][2]
-                alt = points[idx][3]
-                utc_points.append((new_timestamp, lat, lon, alt))
-
-              points = utc_points
-              points.sort()
-
-            else:
-              #add date to points that don't have it yet, because GPRMC message came later 
-              utc_points=[]
-              for idx, point in enumerate(points):
-                if type(points[idx][0]) != type(datetime.datetime.today()):
-                  timestamp = datetime.datetime.combine(
-                      first_gps_date, points[idx][0])
-                else:
-                  timestamp = points[idx][0]                  
-                  lat = points[idx][1]
-                  lon = points[idx][2]
-                  alt = points[idx][3]
-                  utc_points.append((timestamp, lat, lon, alt))
-
-                points = utc_points
-                points.sort()
+              nmea_data = pynmea2.parse(m)
+              if nmea_data and nmea_data.sentence_type == 'GGA':
+                packet[LatitudeElement.name] = LatitudeElement(nmea_data.latitude)
+                packet[LongitudeElement.name] = LongitudeElement(nmea_data.longitude)
+                packet[AltitudeElement.name] = AltitudeElement(nmea_data.altitude)
+              if nmea_data and nmea_data.sentence_type == 'VTG':
+                packet[SpeedElement.name] = SpeedElement(nmea_data.spd_over_grnd_kmph / 3.6) #convert to m/s
 
             offset += newb.end
-             ###############################################################################
-             ############################################################################### 
-
         break
 
-    return points
+    return tel
