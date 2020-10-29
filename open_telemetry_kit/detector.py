@@ -36,7 +36,9 @@ def get_embedded_telemetry_type(metadata: JSONType) -> str:
         elif "tags" in stream and "handler_name" in stream["tags"]:
           if stream["tags"]["handler_name"] == "ParrotVideoMetadata":
             return "parrot"
-          if stream["tags"]["handler_name"] == "PittaSoft Video Media Handler":
+      elif stream["codec_type"] == "video":
+        if "tags" in stream and "handler_name" in stream["tags"] and \
+           stream["tags"]["handler_name"] == "PittaSoft Video Media Handler":
             return "blackvue"
 
   logger.error("Unsupported embedded telemetry type.")

@@ -49,10 +49,10 @@ from dateutil import parser as dup
 Pulls geo data out of a BlackVue video files
 '''
 class BlackvueParser(Parser):
-  def __init__(self, source, 
-               convert_to_epoch: bool = False):
-    super().__init__(source, 
-                     convert_to_epoch = convert_to_epoch)
+  tel_type = "blackvue"
+
+  def __init__(self, source):
+    super().__init__(source)
     self.logger = logging.getLogger("OTK.BlackvueParser")
     
   def read(self) -> Telemetry:
@@ -63,56 +63,67 @@ class BlackvueParser(Parser):
       eof = fd.tell()
       fd.seek(0)
 
-    while fd.tell() < eof:
-      try:
-        box = Box.parse_stream(fd)
-      except RangeError:
-        print('error parsing blackvue GPS information, exiting')
-        sys.exit(1)
-      except ConstError:
-        print('error parsing blackvue GPS information, exiting')
-        sys.exit(1)
+      while fd.tell() < eof:
+        try:
+          box = Box.parse_stream(fd)
+        except RangeError:
+          print('error parsing blackvue GPS information, exiting')
+          sys.exit(1)
+        except ConstError:
+          print('error parsing blackvue GPS information, exiting')
+          sys.exit(1)
 
-      if box.type.decode('utf-8') == 'free':
-        length = len(box.data)
-        offset = 0
-        while offset < length:
-          newb = Box.parse(box.data[offset:])
-          if newb.type.decode('utf-8') == 'gps':
-            lines = newb.data.decode('utf-8')
+        if box.type.decode('utf-8') == 'free':
+          length = len(box.data)
+          offset = 0
+          while offset < length:
+            newb = Box.parse(box.data[offset:])
+            if newb.type.decode('utf-8') == 'gps':
+              lines = newb.data.decode('utf-8')
 
-            # Parse GPS trace
-            timestamp = None
-            packet = None
-            for l in lines.splitlines():
-              m = l.lstrip('[]0123456789')
-              if not m:
-                continue
+              # Parse GPS trace
+              timestamp = None
+              packet = None
+              for l in lines.splitlines():
+                m = l.lstrip('[]0123456789')
+                if not m:
+                  continue
 
-              match = re.search('\[([0-9]+)\]', l)
-              # If new timestamp found
-              if match and match.group(1) != timestamp:
-                if packet:
-                  tel.append(packet)
-                packet = Packet()
-                timestamp = match.group(1)
-                packet[TimestampElement.name] = TimestampElement(float(timestamp) * 1e-3)
+                match = re.search('\[([0-9]+)\]', l)
+                # If new timestamp found
+                if match and match.group(1) != timestamp:
+                  if packet:
+                    tel.append(packet)
+                  packet = Packet()
+                  timestamp = match.group(1)
+                  packet[TimestampElement.name] = TimestampElement(float(timestamp) * 1e-3)
 
-              #remove timestamp on tail if it exists
-              try:
-                m = m[:m.rindex('[')]
-              except:
-                pass
+                #remove timestamp on tail if it exists
+                try:
+                  m = m[:m.rindex('[')]
+                except:
+                  pass
 
-              nmea_data = pynmea2.parse(m)
-              if nmea_data and nmea_data.sentence_type == 'GGA':
-                packet[LatitudeElement.name] = LatitudeElement(nmea_data.latitude)
-                packet[LongitudeElement.name] = LongitudeElement(nmea_data.longitude)
-                packet[AltitudeElement.name] = AltitudeElement(nmea_data.altitude)
-              if nmea_data and nmea_data.sentence_type == 'VTG':
-                packet[SpeedElement.name] = SpeedElement(nmea_data.spd_over_grnd_kmph / 3.6) #convert to m/s
+                try:
+                  m = m[:m.index("\x00")]
+                except:
+                  pass
 
+                try:
+                  nmea_data = pynmea2.parse(m)
+                  if nmea_data and nmea_data.sentence_type == 'GGA':
+                    packet[LatitudeElement.name] = LatitudeElement(nmea_data.latitude)
+                    packet[LongitudeElement.name] = LongitudeElement(nmea_data.longitude)
+                    if nmea_data.altitude:
+                      packet[AltitudeElement.name] = AltitudeElement(nmea_data.altitude)
+                  if nmea_data and nmea_data.sentence_type == 'VTG':
+                    packet[SpeedElement.name] = SpeedElement(nmea_data.spd_over_grnd_kmph / 3.6) #convert to m/s
+                except:
+                  self.logger.warn("Couldn't parse nmea sentence. Skipping...")
+
+              if packet:
+                tel.append(packet)
             offset += newb.end
-        break
+          break
 
-    return tel
+      return tel
