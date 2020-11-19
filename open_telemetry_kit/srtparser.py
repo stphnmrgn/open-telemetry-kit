@@ -73,7 +73,7 @@ class SRTParser(Parser):
           data = self._extractDatetime(data, packet)
           self._extractData(data, packet)
           if len(packet) > 0:
-            self.logger.info("Adding new packet.")
+            self.logger.debug("Adding new packet.")
             tel.append(packet)
           else:
             self.logger.warn("No telemetry was found in block. Packet is empty, skipping.")
@@ -133,7 +133,7 @@ class SRTParser(Parser):
     
     elif self.require_timestamp:
       if self.beg_timestamp != 0:
-        self.logger.info("No datetime was found. Using timeframe and video creation time to estimate timestamp")
+        self.logger.debug("No datetime was found. Using timeframe and video creation time to estimate timestamp")
         tfb = packet[TimeframeBeginElement.name].value
         tfe = packet[TimeframeEndElement.name].value
         avg = (tfb+tfe) / 2
@@ -149,7 +149,9 @@ class SRTParser(Parser):
   def _extractData(self, block: str, packet: Dict[str, Element]):
     # Make single line. Dealing with excess whitespace later
     block = block.lstrip()
-    if block[0].isalpha():
+    if block[0] == 'F':
+      self._extractLabeledCommaList(block, packet)
+    elif block[0].isalpha():
       self._extractLabeledList(block, packet)
     elif "[" in block:
       self._extractBracket(block, packet)
@@ -163,19 +165,61 @@ class SRTParser(Parser):
 
   # Looks for telemetry of the form:
   # F/7.1, SS 320, ISO 100, EV 0, GPS (-122.3699, 37.8166, 15), D 224.22m, H 58.20m, H.S 15.71m/s, V.S 0.10m/s 
-  # OR
+  # F/10, SS 240 A, ISO 100, EV 0, GPS (-121.2880, 37.9536, 18), D 290.74m, H 152.10m, H.S 9.48m/s, V.S 0.00m/s
+  def _extractLabeledCommaList(self, block: str, packet: Dict[str, Element]):
+    lbl_val_delim = re.compile(r"[/ :\(]")
+    alpha = re.compile(r"[a-zA-Z]")
+    numeric = re.compile(r"[\d\.-]+")
+    space = re.compile(r"\s+")
+    nonspace = re.compile(r"\S+")
+    lbl_start = 0
+    comma_pos = 0
+    # while lbl_start < len(block):
+    while comma_pos != -1:
+      match = lbl_val_delim.search(block, lbl_start)
+      lbl_end = match.start()
+      sep = match.end()
+      label = block[lbl_start:lbl_end]
+      if label in ["GPS", "HOME"]:
+        end = self._extractGPS(block, lbl_start, packet)
+        match = space.search(block, end)
+        lbl_start = match.end()
+      else:
+        match = nonspace.search(block, sep)
+        val_start = match.start()
+        # match = space.search(block, val_start)
+        comma_pos = block.find(',', val_start)
+        # if comma_pos == -1: #EOL
+        #   comma_pos = len(block)
+        # lbl_start = match.end()
+        if comma_pos != -1:
+          match = alpha.search(block, comma_pos)
+          lbl_start = match.start()
+        val_full = block[val_start:comma_pos]
+        match = numeric.search(val_full)
+        try:
+          val = match[0]
+          if label in self.element_dict:
+            packet[self.element_dict[label].name] = self.element_dict[label](val)
+          else:
+            self.logger.warn("Adding unknown element ({} : {})".format(label, val))
+            packet[label] = UnknownElement(val)
+        except:
+          self.logger.info("Could not find valid value for '{}' element".format(label))
+
+  # Looks for telemetry of the form:
   # HOME(-122.1505,37.4245) 2019.07.06 19:05:07 //Note: timestamp and newlines will be removed by this point
   # GPS(-122.1509,37.4242,16) BAROMETER:80.0
   # ISO:110 Shutter:120 EV: 0 Fnum:F2.8
   def _extractLabeledList(self, block: str, packet: Dict[str, Element]):
-    block = block.replace(',', ' ')
-    separator = re.compile(r"[/ :\(]")
+    # block = block.replace(',', ' ')
+    lbl_val_delim = re.compile(r"[/ :\(]")
     numeric = re.compile(r"[\d\.-]+")
     space = re.compile(r"\s+")
     nonspace = re.compile(r"\S+")
     lbl_start = 0
     while lbl_start < len(block):
-      match = separator.search(block, lbl_start)
+      match = lbl_val_delim.search(block, lbl_start)
       lbl_end = match.start()
       sep = match.end()
       label = block[lbl_start:lbl_end]
@@ -207,13 +251,14 @@ class SRTParser(Parser):
   # GPS(-122.3699,37.5929,19) BAROMETER:64.3[...] //(long, lat) OR
   # GPS(37.8757,-122.3061,0.0M) BAROMETER:36.9M[...] //(lat, long)
   def _extractGPS(self, block: str, start: int, packet: Dict[str, Element]):
+    # block = block.replace(',', ' ')
     gps_start = block.find('(', start)
     label = block[start:gps_start].strip()
     gps_end = block.find(')', gps_start)
     # end_line = block.find('\n', gps_end)
 
     # coord = re.compile(r"[-\d\.]+")
-    coord_split = r"[ ]+"
+    coord_split = r"[ ,]+"
     coords = re.split(coord_split, block[gps_start + 1 : gps_end])
     # coords = coord.findall(block, gps_start, gps_end)
 
