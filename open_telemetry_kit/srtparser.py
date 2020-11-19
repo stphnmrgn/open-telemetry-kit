@@ -123,7 +123,7 @@ class SRTParser(Parser):
         dt = dt[:dt.rfind(micro_syn)] + dt[dt.rfind(micro_syn)+1:]
       
       if (self.convert_to_epoch):
-        self.logger.info("Converting datetime to epoch")
+        self.logger.debug("Converting datetime to epoch")
         dt = dup.parse(dt).timestamp()
         packet[TimestampElement.name] = TimestampElement(dt)
       else:
@@ -214,7 +214,7 @@ class SRTParser(Parser):
   def _extractLabeledList(self, block: str, packet: Dict[str, Element]):
     # block = block.replace(',', ' ')
     lbl_val_delim = re.compile(r"[/ :\(]")
-    numeric = re.compile(r"[\d\.-]+")
+    numeric = re.compile(r"[\d\./-]+")
     space = re.compile(r"\s+")
     nonspace = re.compile(r"\S+")
     lbl_start = 0
