@@ -34,7 +34,7 @@ class ASSParser(Parser):
     _, _, ext = detector.split_path(self.source)
     if self.is_embedded and ext != ".ass":
       ass = detector.read_embedded_subtitles(self.source, "ass")
-      self._process(ass.splitlines(), tel)
+      self._process(ass.splitlines(True), tel)
 
     else:
       with open(self.source, 'r') as srt:
@@ -80,9 +80,9 @@ class ASSParser(Parser):
   def _parseLine(self, line: str, packet: Dict[str, Element]):
     line = line.replace("Dialogue: ", "")
     elements = line.split(',', maxsplit=9)
-    tfb = (dup.parse(elements[2]) - dup.parse("00:00:00")).total_seconds()
+    tfb = (dup.parse(elements[1]) - dup.parse("00:00:00")).total_seconds()
     packet[TimeframeBeginElement.name] = TimeframeBeginElement(tfb)
-    tfe = (dup.parse(elements[3]) - dup.parse("00:00:00")).total_seconds()
+    tfe = (dup.parse(elements[2]) - dup.parse("00:00:00")).total_seconds()
     packet[TimeframeEndElement.name] = TimeframeEndElement(tfe)
     data = self._extractDatetime(elements[-1], packet)
     self._extractData(data, packet)
@@ -90,14 +90,14 @@ class ASSParser(Parser):
   # Example datetimes
   # 2019-09-25 01:22:35,118,697
   # Jun 19, 2019 4:47:39 PM
-  def _extractDatetime(self, block: str, packet: Dict[str, Element]):
+  def _extractDatetime(self, data: str, packet: Dict[str, Element]):
     # This should find any reasonably formatted (and some not so reasonably formatted) datetimes
     # Looks for:
     # 1+ alphanum, [space, tab, '/', '-',  or .'], 1+ digits, [space, tab, '/', '-',  or .']       Date 
     #   1+ digits, 1+ whitespace,                                                                  Date 
     #   1+ digits, ':' 1+ digits, ':', 1+ digits, ['.' or ','], 0+ whitespace, 0+ digits,          Time 
     #   the same separator previously found, 0+ whitespace, 0+ digits, period identifier           Time 
-    match = re.search(r"\w+[ \t,-/.]*\d+[ \t,-/.]*\d+[ \t]*\d+:\d+:\d+([.,])?[ \t]*\d*\1?[ \t]*\d*[ \t]*[aApPmM.]{0,2}", block)
+    match = re.search(r"\w+[ \t,-/.]*\d+[ \t,-/.]*\d+[ \t]*\d+:\d+:\d+([.,])?[ \t]*\d*\1?[ \t]*\d*[ \t]*[aApPmM.]{0,2}", data)
 
     # dateutil is pretty good, but can't handle the double microsecond separator 
     # that sometimes shows up in DJIs telemetry so check to see if it exists and get rid of it
@@ -110,13 +110,13 @@ class ASSParser(Parser):
         dt = dt[:dt.rfind(micro_syn)] + dt[dt.rfind(micro_syn)+1:]
       
       if (self.convert_to_epoch):
-        self.logger.info("Converting datetime to epoch")
+        self.logger.debug("Converting datetime to epoch")
         dt = dup.parse(dt).timestamp()
         packet[TimestampElement.name] = TimestampElement(dt)
       else:
         packet[DatetimeElement.name] = DatetimeElement(dt)
 
-      return block[0 : match.start()] + block[match.end():]
+      return data[0 : match.start()] + data[match.end():]
     
     elif self.require_timestamp:
       if self.beg_timestamp != 0:
@@ -129,54 +129,33 @@ class ASSParser(Parser):
       else:
         self.logger.critical("Could not find any time elements when require_timestamp was set")
 
-    return block
+    return data
 
-  # Try to identify how data is formated.
-  # See respective methods for exampls of each data format
-  def _extractData(self, block: str, packet: Dict[str, Element]):
-    # Make single line. Dealing with excess whitespace later
-    block = block.lstrip()
-    if block[0].isalpha():
-      self._extractLabeledList(block, packet)
-    elif "[" in block:
-      self._extractBracket(block, packet)
-    else:
-      self._extractUnlabledList(block, packet)
+  def _extractData(self, data: str, packet: Dict[str, Element]):
+    data = data.replace(r"\N", "")
 
-    if LatitudeElement.name not in packet or  \
-       LongitudeElement.name not in packet or \
-       AltitudeElement.name not in packet:
-      self.logger.warn("No or only partial GPS data found")
-
-  # Looks for telemetry of the form:
-  # F/7.1, SS 320, ISO 100, EV 0, GPS (-122.3699, 37.8166, 15), D 224.22m, H 58.20m, H.S 15.71m/s, V.S 0.10m/s 
-  # OR
-  # HOME(-122.1505,37.4245) 2019.07.06 19:05:07 //Note: timestamp and newlines will be removed by this point
-  # GPS(-122.1509,37.4242,16) BAROMETER:80.0
-  # ISO:110 Shutter:120 EV: 0 Fnum:F2.8
-  def _extractLabeledList(self, block: str, packet: Dict[str, Element]):
-    block = block.replace(',', ' ')
-    separator = re.compile(r"[/ :\(]")
-    numeric = re.compile(r"[\d\.-]+")
+    lbl_val_delim = re.compile(r"[/ :\(]")
+    numeric = re.compile(r"[\d\./-]+")
     space = re.compile(r"\s+")
     nonspace = re.compile(r"\S+")
+
     lbl_start = 0
-    while lbl_start < len(block):
-      match = separator.search(block, lbl_start)
+    while lbl_start < len(data):
+      match = lbl_val_delim.search(data, lbl_start)
       lbl_end = match.start()
       sep = match.end()
-      label = block[lbl_start:lbl_end]
+      label = data[lbl_start:lbl_end]
       if label in ["GPS", "HOME"]:
-        end = self._extractGPS(block, lbl_start, packet)
-        match = space.search(block, end)
+        end = self._extractGPS(data, lbl_start, packet)
+        match = space.search(data, end)
         lbl_start = match.end()
       else:
-        match = nonspace.search(block, sep)
+        match = nonspace.search(data, sep)
         val_start = match.start()
-        match = space.search(block, val_start)
+        match = space.search(data, val_start)
         val_end = match.start()
         lbl_start = match.end()
-        val_full = block[val_start:val_end]
+        val_full = data[val_start:val_end]
         match = numeric.search(val_full)
         try:
           val = match[0]
@@ -187,84 +166,40 @@ class ASSParser(Parser):
             packet[label] = UnknownElement(val)
         except:
           self.logger.info("Could not find valid value for '{}' element".format(label))
-        
-  # Input can be:
-  # HOME(-121.1505,37.4245)[...]
-  # GPS (-122.3699, 37.8166, 15)[...]
-  # GPS(-122.3699,37.5929,19) BAROMETER:64.3[...] //(long, lat) OR
-  # GPS(37.8757,-122.3061,0.0M) BAROMETER:36.9M[...] //(lat, long)
-  def _extractGPS(self, block: str, start: int, packet: Dict[str, Element]):
-    gps_start = block.find('(', start)
-    label = block[start:gps_start].strip()
-    gps_end = block.find(')', gps_start)
-    # end_line = block.find('\n', gps_end)
 
-    # coord = re.compile(r"[-\d\.]+")
-    coord_split = r"[ ]+"
-    coords = re.split(coord_split, block[gps_start + 1 : gps_end])
-    # coords = coord.findall(block, gps_start, gps_end)
+    if LatitudeElement.name not in packet or  \
+       LongitudeElement.name not in packet or \
+       AltitudeElement.name not in packet:
+      self.logger.warn("No or only partial GPS data found")
+
+        
+  # HOME(W: 122.254875, N: 38.124855)  GPS(W: 122.252266, N: 38.128864, 91)
+  def _extractGPS(self, line: str, start: int, packet: Dict[str, Element]):
+
+    gps_start = line.find('(', start)
+    label = line[start:gps_start].strip()
+    gps_end = line.find(')', gps_start)
+
+    coord_split = r", "
+    coords = re.split(coord_split, line[gps_start + 1 : gps_end])
+    numeric = re.compile(r"[\d\.-]+")
+    coords = [numeric.search(coord)[0] for coord in coords ]
 
     if len(coords) < 2:
       self.logger.error("Could not find GPS coordinates where expected")
 
     if label == "GPS":
-      if block[gps_end - 1] == 'M':
-        packet[LatitudeElement.name] = LatitudeElement(coords[0])
-        packet[LongitudeElement.name] = LongitudeElement(coords[1])
-      #long, lat
-      else:
-        packet[LongitudeElement.name] = LongitudeElement(coords[0])
-        packet[LatitudeElement.name] = LatitudeElement(coords[1])
+      packet[LongitudeElement.name] = LongitudeElement(coords[0])
+      packet[LatitudeElement.name] = LatitudeElement(coords[1])
 
       if len(coords) == 3:
-        # If a 'BAROMETER' value exists this will get overwritten
-        # This is expected and desired behavior
         packet[AltitudeElement.name] = AltitudeElement(coords[2])
 
     else: #label == "HOME"
-      if block[gps_end - 1] == 'M':
-        packet[HomeLatitudeElement.name] = HomeLatitudeElement(coords[0])
-        packet[HomeLongitudeElement.name] = HomeLongitudeElement(coords[1])
-      #long, lat
-      else:
-        packet[HomeLongitudeElement.name] = HomeLongitudeElement(coords[0])
-        packet[HomeLatitudeElement.name] = HomeLatitudeElement(coords[1])
+      packet[HomeLongitudeElement.name] = HomeLongitudeElement(coords[0])
+      packet[HomeLatitudeElement.name] = HomeLatitudeElement(coords[1])
 
       if len(coords) == 3:
         packet[HomeAltitudeElement.name] = HomeAltitudeElement(coords[2])
 
     return gps_end
-
-  # brackets: [iso : 110] [shutter : 1/200.0] [fnum : 280] [ev : 0.7] [ct : 5064] [color_md : default] [focal_len : 240] [latitude: 0.608553] [longtitude: -1.963763] [altitude: 1429.697998]
-  def _extractBracket(self, block: str, packet: Dict[str, Element]):
-    # find the first '[' and last ']'
-    data_start = block.find('[')
-    data_end = block.rfind(']')
-    data = block[data_start : data_end]
-    data = data.replace(',','')
-
-    # This will split on the common delimters found in DJIs srts and return a list
-    # List _should_ be alternating keyword, value barring nothing weird from DJI
-    # which they have proven is not a safe assumption
-    data = re.split(r"[\[\]\s:]+", data)
-    if not data[0]: #remove empty string from regex search
-      data.pop(0)
-    
-    for i in range(0, len(data), 2):
-      key = data[i]
-      if key in self.element_dict:
-        element_cls = self.element_dict[key]
-        packet[element_cls.name] = element_cls(data[i+1])
-      else:
-        self.logger.warn("Adding unknown element ({} : {})".format(key, data[i+1]))
-        packet[key] = UnknownElement(data[i+1])
-
-  # whitespace: 38.47993, -122.69943, 115.5m, 302°
-  def _extractUnlabledList(self, block: str, packet: Dict[str, Element]):
-    data = block.strip().split(", ")
-    if len(data) > 0 and len(data) <= 4:
-      packet[LatitudeElement.name] = LatitudeElement(data[0])
-      packet[LongitudeElement.name] = LongitudeElement(data[1])
-      packet[AltitudeElement.name] = AltitudeElement(data[2].strip('m'))
-      if len(data) > 3:
-        packet[PlatformHeadingAngleElement.name] = PlatformHeadingAngleElement(data[3][0:-1])
