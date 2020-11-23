@@ -28,8 +28,11 @@ def read_video_metadata_file(src: str):
 def get_embedded_telemetry_type(metadata: JSONType) -> str:
   if "streams" in metadata:
     for stream in metadata["streams"]:
-      if stream["codec_type"] == "subtitle" and stream["codec_tag_string"] == "text":
-        return "srt"
+      if stream["codec_type"] == "subtitle":
+        if stream["codec_tag_string"] == "text":
+          return "srt"
+        elif stream["codec_tag_string"] == "tx3g":
+          return "ass"
       elif stream["codec_type"] == "data":
         if "codec_tag_string" in stream and stream["codec_tag_string"] == "KLVA":
           return "klv"
@@ -78,10 +81,10 @@ def create_telemetry_parser(src: str) -> Parser:
       else:
         return cls(src, is_embedded=embedded)
 
-def read_embedded_subtitles(src: str) -> str:
-  cmd = "ffmpeg -y -i " + src + " -f srt - " 
-  srt = os.popen(cmd).read()
-  return srt
+def read_embedded_subtitles(src: str, file_format: str) -> str:
+  cmd = "ffmpeg -y -i " + src + " -f " + file_format + " - " 
+  subtitles = os.popen(cmd).read()
+  return subtitles
 
 def read_klv(src: str, metadata: JSONType) -> bytes:
   klv_idx = None
