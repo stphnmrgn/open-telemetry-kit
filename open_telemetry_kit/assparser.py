@@ -14,41 +14,27 @@ import os
 from typing import Dict
 import logging
 
-class SRTParser(Parser):
-  tel_type = "srt"
+class ASSParser(Parser):
+  tel_type = "ass"
 
   def __init__(self,
                source: str, 
                is_embedded: bool = False, 
-               convert_to_epoch: bool = False, 
-               require_timestamp: bool = False):
+               convert_to_epoch: bool = False):
     super().__init__(source, 
-                     convert_to_epoch = convert_to_epoch, 
-                     require_timestamp = require_timestamp)
+                     convert_to_epoch = convert_to_epoch)
     self.is_embedded = is_embedded
     self.beg_timestamp = 0
     self.convert_to_epoch = convert_to_epoch
-    self.logger = logging.getLogger("OTK.SRTParser")
+    self.logger = logging.getLogger("OTK.ASSParser")
 
   def read(self) -> Telemetry:
     tel = Telemetry()
 
     _, _, ext = detector.split_path(self.source)
-    if self.is_embedded and ext != ".srt":
-      if self.require_timestamp:
-        video_metadata = detector.read_video_metadata(self.source)
-        if video_metadata and "streams" in video_metadata \
-           and "tags" in video_metadata["streams"][0]     \
-           and "creation_time" in video_metadata["streams"][0]["tags"]:
-
-          video_datetime = video_metadata["streams"][0]["tags"]["creation_time"]
-          self.beg_timestamp = dup.parse(video_datetime).timestamp()
-          self.logger.info("Setting video creation time to: {}".format(self.beg_timestamp))
-        else:
-          self.logger.warn("Could not find creation time for video.")
-
-      srt = detector.read_embedded_subtitles(self.source, "srt")
-      self._process(srt.splitlines(True), tel)
+    if self.is_embedded and ext != ".ass":
+      ass = detector.read_embedded_subtitles(self.source, "ass")
+      self._process(ass.splitlines(), tel)
 
     else:
       with open(self.source, 'r') as srt:
@@ -60,45 +46,46 @@ class SRTParser(Parser):
     return tel
 
   def _process(self, srt: str, tel: Telemetry):
-    block = ""
     for line in srt:
-      if line == '\n' and len(block) > 0:
-        try:
-          packet = Packet()
-          sec_line_beg = block.find('\n') + 1
-          sec_line_end = block.find('\n', sec_line_beg)
-          timeframe = block[sec_line_beg : sec_line_end]
-          data = block[sec_line_end + 1 : ]
-          self._extractTimeframe(timeframe, packet)
-          data = self._extractDatetime(data, packet)
-          self._extractData(data, packet)
-          if len(packet) > 0:
-            self.logger.info("Adding new packet.")
-            tel.append(packet)
-          else:
-            self.logger.warn("No telemetry was found in block. Packet is empty, skipping.")
-        except Exception:
-          self.logger.error("There was an error parsing this srt block. Skipping and continuing...")
+      if "Dialogue" in line:
+        packet = Packet()
+        self._parseLine(line, packet)
+        tel.append(packet)
+      # if line == '\n' and len(block) > 0:
+      #   try:
+      #     packet = Packet()
+      #     sec_line_beg = block.find('\n') + 1
+      #     sec_line_end = block.find('\n', sec_line_beg)
+      #     timeframe = block[sec_line_beg : sec_line_end]
+      #     data = block[sec_line_end + 1 : ]
+      #     self._extractTimeframe(timeframe, packet)
+      #     data = self._extractDatetime(data, packet)
+      #     self._extractData(data, packet)
+      #     if len(packet) > 0:
+      #       self.logger.info("Adding new packet.")
+      #       tel.append(packet)
+      #     else:
+      #       self.logger.warn("No telemetry was found in block. Packet is empty, skipping.")
+      #   except Exception:
+      #     self.logger.error("There was an error parsing this srt block. Skipping and continuing...")
 
-        block = ""
-      elif line == '\n':
-        continue
-      else:
-        block += line
+      #   block = ""
+      # elif line == '\n':
+      #   continue
+      # else:
+      #   block += line
 
-  # Example timeframe:
-  # 00:00:00,033 --> 00:00:00,066
-  def _extractTimeframe(self, line: str, packet: Dict[str, Element]):
-    sep_pos = line.find("-->")
-    if sep_pos > -1:
-      tfb = (dup.parse(line[:sep_pos].strip()) - dup.parse("00:00:00")).total_seconds()
-      packet[TimeframeBeginElement.name] = TimeframeBeginElement(tfb)
-      tfe = (dup.parse(line[sep_pos+3:].strip()) - dup.parse("00:00:00")).total_seconds()
-      packet[TimeframeEndElement.name] = TimeframeEndElement(tfe)
-    else:
-      # Timeframes in this format are one of the few defined requirements in srt
-      # If one wasn't found either parsing failed or this file doesn't follow the standard
-      self.logger.error("No timeframe was found. It is likely something went wrong with parsing")
+  # Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+  # Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,HOME(W: 97.616776, N: 30.219286) 2020-11-01 15:29:24\NGPS(W: 97.621475, N: 30.214199, 161) \NISO:105 SHUTTER:500 EV:0.0 F-NUM:2.8
+  def _parseLine(self, line: str, packet: Dict[str, Element]):
+    line = line.replace("Dialogue: ", "")
+    elements = line.split(',', maxsplit=9)
+    tfb = (dup.parse(elements[2]) - dup.parse("00:00:00")).total_seconds()
+    packet[TimeframeBeginElement.name] = TimeframeBeginElement(tfb)
+    tfe = (dup.parse(elements[3]) - dup.parse("00:00:00")).total_seconds()
+    packet[TimeframeEndElement.name] = TimeframeEndElement(tfe)
+    data = self._extractDatetime(elements[-1], packet)
+    self._extractData(data, packet)
 
   # Example datetimes
   # 2019-09-25 01:22:35,118,697
