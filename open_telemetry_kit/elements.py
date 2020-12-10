@@ -2023,7 +2023,7 @@ class WaypointListElement(Element, MISB0601):
 
 class ApertureElement(FloatElement):
   name = "aperture"
-  names = {"aperture", "Aperture", "f", "F", "fnum", "Fnum"}
+  names = {"aperture", "Aperture", "f", "F", "fnum", "Fnum", "F-NUM"}
 
   def __init__(self, value: float):
     super().__init__(value)
@@ -2038,7 +2038,7 @@ class ShutterSpeedElement(StrElement):
   # Even though this is a number it is often represented as "1/###".
   # There's no real way to know whether a given value without "1/" should actually have that or not
   name = "shutterSpeed"
-  names = {"shutterSpeed", "ShutterSpeed", "shutter", "Shutter", "ss", "SS"}
+  names = {"shutterSpeed", "ShutterSpeed", "shutter", "Shutter", "SHUTTER", "ss", "SS"}
 
 class ISOElement(IntElement):
   name = "ISO"

@@ -47,7 +47,7 @@ class SRTParser(Parser):
         else:
           self.logger.warn("Could not find creation time for video.")
 
-      srt = detector.read_embedded_subtitles(self.source)
+      srt = detector.read_embedded_subtitles(self.source, "srt")
       self._process(srt.splitlines(True), tel)
 
     else:
@@ -172,9 +172,9 @@ class SRTParser(Parser):
     numeric = re.compile(r"[\d\.-]+")
     space = re.compile(r"\s+")
     nonspace = re.compile(r"\S+")
+
     lbl_start = 0
     comma_pos = 0
-    # while lbl_start < len(block):
     while comma_pos != -1:
       match = lbl_val_delim.search(block, lbl_start)
       lbl_end = match.start()
@@ -187,11 +187,7 @@ class SRTParser(Parser):
       else:
         match = nonspace.search(block, sep)
         val_start = match.start()
-        # match = space.search(block, val_start)
         comma_pos = block.find(',', val_start)
-        # if comma_pos == -1: #EOL
-        #   comma_pos = len(block)
-        # lbl_start = match.end()
         if comma_pos != -1:
           match = alpha.search(block, comma_pos)
           lbl_start = match.start()
@@ -251,16 +247,12 @@ class SRTParser(Parser):
   # GPS(-122.3699,37.5929,19) BAROMETER:64.3[...] //(long, lat) OR
   # GPS(37.8757,-122.3061,0.0M) BAROMETER:36.9M[...] //(lat, long)
   def _extractGPS(self, block: str, start: int, packet: Dict[str, Element]):
-    # block = block.replace(',', ' ')
     gps_start = block.find('(', start)
     label = block[start:gps_start].strip()
     gps_end = block.find(')', gps_start)
-    # end_line = block.find('\n', gps_end)
 
-    # coord = re.compile(r"[-\d\.]+")
     coord_split = r"[ ,]+"
     coords = re.split(coord_split, block[gps_start + 1 : gps_end])
-    # coords = coord.findall(block, gps_start, gps_end)
 
     if len(coords) < 2:
       self.logger.error("Could not find GPS coordinates where expected")
