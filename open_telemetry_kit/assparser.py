@@ -51,29 +51,6 @@ class ASSParser(Parser):
         packet = Packet()
         self._parseLine(line, packet)
         tel.append(packet)
-      # if line == '\n' and len(block) > 0:
-      #   try:
-      #     packet = Packet()
-      #     sec_line_beg = block.find('\n') + 1
-      #     sec_line_end = block.find('\n', sec_line_beg)
-      #     timeframe = block[sec_line_beg : sec_line_end]
-      #     data = block[sec_line_end + 1 : ]
-      #     self._extractTimeframe(timeframe, packet)
-      #     data = self._extractDatetime(data, packet)
-      #     self._extractData(data, packet)
-      #     if len(packet) > 0:
-      #       self.logger.info("Adding new packet.")
-      #       tel.append(packet)
-      #     else:
-      #       self.logger.warn("No telemetry was found in block. Packet is empty, skipping.")
-      #   except Exception:
-      #     self.logger.error("There was an error parsing this srt block. Skipping and continuing...")
-
-      #   block = ""
-      # elif line == '\n':
-      #   continue
-      # else:
-      #   block += line
 
   # Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
   # Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,HOME(W: 97.616776, N: 30.219286) 2020-11-01 15:29:24\NGPS(W: 97.621475, N: 30.214199, 161) \NISO:105 SHUTTER:500 EV:0.0 F-NUM:2.8
