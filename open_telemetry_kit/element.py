@@ -37,7 +37,7 @@ class FloatElement(Element):
     try:
       self.value = float(value)
     except:
-      logger.error("'{}' could not be converted to a float value, leaving as string.".format(value))
+      logger.warn("'{}' could not be converted to a float value, leaving as string.".format(value))
       self.value = str(value)
 
 class IntElement(Element):
@@ -45,7 +45,7 @@ class IntElement(Element):
     try:
       self.value = int(value)
     except:
-      logger.error("'{}' could not be converted to a int value, leaving as string.".format(value))
+      logger.warn("'{}' could not be converted to a int value, leaving as string.".format(value))
       self.value = str(value)
 
 class StrElement(Element):
