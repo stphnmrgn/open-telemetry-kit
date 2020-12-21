@@ -160,21 +160,31 @@ class ASSParser(Parser):
     coord_split = r", "
     coords = re.split(coord_split, line[gps_start + 1 : gps_end])
     numeric = re.compile(r"[\d\.-]+")
-    coords = [numeric.search(coord)[0] for coord in coords ]
+    # coords = [numeric.search(coord)[0] for coord in coords ]
 
     if len(coords) < 2:
       self.logger.error("Could not find GPS coordinates where expected")
 
     if label == "GPS":
-      packet[LongitudeElement.name] = LongitudeElement(coords[0])
-      packet[LatitudeElement.name] = LatitudeElement(coords[1])
+      packet[LongitudeElement.name] = LongitudeElement( numeric.search(coords[0])[0] )
+      if 'W' in coords[0]:
+        packet[LongitudeElement.name].value *= -1
+
+      packet[LatitudeElement.name] = LatitudeElement( numeric.search(coords[1])[0] )
+      if 'S' in coords[1]:
+        packet[LongitudeElement.name].value *= -1
 
       if len(coords) == 3:
         packet[AltitudeElement.name] = AltitudeElement(coords[2])
 
     else: #label == "HOME"
-      packet[HomeLongitudeElement.name] = HomeLongitudeElement(coords[0])
-      packet[HomeLatitudeElement.name] = HomeLatitudeElement(coords[1])
+      packet[HomeLongitudeElement.name] = HomeLongitudeElement(numeric.search(coords[0])[0])
+      if 'W' in coords[0]:
+        packet[HomeLongitudeElement.name].value *= -1
+
+      packet[HomeLatitudeElement.name] = HomeLatitudeElement(numeric.search(coords[1])[0])
+      if 'S' in coords[1]:
+        packet[HomeLongitudeElement.name].value *= -1
 
       if len(coords) == 3:
         packet[HomeAltitudeElement.name] = HomeAltitudeElement(coords[2])
