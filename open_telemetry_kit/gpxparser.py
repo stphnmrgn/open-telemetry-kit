@@ -54,7 +54,7 @@ class GPXParser(Parser):
     for key, val in node.items():
       self._add_element(packet, key, val)
 
-    if not node.text.isspace():
+    if node.text and not node.text.isspace():
       tag = node.tag[node.tag.find('}')+1:]
       self._add_element(packet, tag, node.text.strip())
 
