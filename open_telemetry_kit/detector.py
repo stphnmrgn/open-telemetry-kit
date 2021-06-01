@@ -36,7 +36,7 @@ def get_embedded_telemetry_type(metadata: JSONType) -> str:
       elif stream["codec_type"] == "data":
         if "codec_tag_string" in stream and stream["codec_tag_string"] == "KLVA":
           return "klv"
-        elif "codec_tag_string" in stream and stream["codev_tag_string"] == "gpmd":
+        elif "codec_tag_string" in stream and stream["codec_tag_string"] == "gpmd":
           return "gopro"
         elif "tags" in stream and "handler_name" in stream["tags"]:
           if stream["tags"]["handler_name"] == "ParrotVideoMetadata":
