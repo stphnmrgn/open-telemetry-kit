@@ -28,23 +28,24 @@ def read_video_metadata_file(src: str):
 def get_embedded_telemetry_type(metadata: JSONType) -> str:
   if "streams" in metadata:
     for stream in metadata["streams"]:
-      if stream["codec_type"] == "subtitle":
-        if stream["codec_tag_string"] == "text":
-          return "srt"
-        elif stream["codec_tag_string"] == "tx3g":
-          return "ass"
-      elif stream["codec_type"] == "data":
-        if "codec_tag_string" in stream and stream["codec_tag_string"] == "KLVA":
-          return "klv"
-        elif "codec_tag_string" in stream and stream["codec_tag_string"] == "gpmd":
-          return "gopro"
-        elif "tags" in stream and "handler_name" in stream["tags"]:
-          if stream["tags"]["handler_name"] == "ParrotVideoMetadata":
-            return "parrot"
-      elif stream["codec_type"] == "video":
-        if "tags" in stream and "handler_name" in stream["tags"] and \
-           stream["tags"]["handler_name"] == "PittaSoft Video Media Handler":
-            return "blackvue"
+      if "codec_type" in stream:
+        if stream["codec_type"] == "subtitle":
+          if stream["codec_tag_string"] == "text":
+            return "srt"
+          elif stream["codec_tag_string"] == "tx3g":
+            return "ass"
+        elif stream["codec_type"] == "data":
+          if "codec_tag_string" in stream and stream["codec_tag_string"] == "KLVA":
+            return "klv"
+          elif "codec_tag_string" in stream and stream["codec_tag_string"] == "gpmd":
+            return "gopro"
+          elif "tags" in stream and "handler_name" in stream["tags"]:
+            if stream["tags"]["handler_name"] == "ParrotVideoMetadata":
+              return "parrot"
+        elif stream["codec_type"] == "video":
+          if "tags" in stream and "handler_name" in stream["tags"] and \
+            stream["tags"]["handler_name"] == "PittaSoft Video Media Handler":
+              return "blackvue"
 
   logger.error("Unsupported embedded telemetry type.")
   return None
@@ -68,10 +69,10 @@ def get_telemetry_type(src: str) -> Tuple[str, bool]:
     if tel_type:
       logger.info("Found embedded telemetry of type '{}'".format(tel_type))
       return (tel_type, True)
-  
+
   logger.error("{} contains an unsupported telemetry type".format(src))
   return (None, False)
-    
+
 def create_telemetry_parser(src: str) -> Parser:
   tel_type, embedded = get_telemetry_type(src)
 
@@ -84,7 +85,7 @@ def create_telemetry_parser(src: str) -> Parser:
         return cls(src, is_embedded=embedded)
 
 def read_embedded_subtitles(src: str, file_format: str) -> str:
-  cmd = "ffmpeg -y -i " + src + " -f " + file_format + " - " 
+  cmd = "ffmpeg -y -i " + src + " -f " + file_format + " - "
   subtitles = os.popen(cmd).read()
   return subtitles
 
@@ -92,9 +93,10 @@ def read_klv(src: str, metadata: JSONType) -> bytes:
   klv_idx = None
   if "streams" in metadata:
       for idx, stream in enumerate(metadata["streams"]):
-        if stream["codec_type"] == "data" and stream["codec_tag_string"] == "KLVA":
-          klv_idx = str(idx)
-          break
+        if "codec_type" in stream and stream["codec_type"] == "data" and \
+          stream["codec_tag_string"] == "KLVA":
+            klv_idx = str(idx)
+            break
 
   cmd = ["ffmpeg", "-loglevel", "quiet", "-i" , src , "-map", "0:" + klv_idx, "-codec", "copy", "-f", "data", "-"]
   klv = subprocess.run(cmd, stdout=subprocess.PIPE).stdout
