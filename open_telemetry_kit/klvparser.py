@@ -39,11 +39,15 @@ class KLVParser(Parser):
 
   def read(self):
     metadata = read_video_metadata(self.source)
-    klv = read_klv(self.source, metadata)
+    if metadata:
+      klv = read_klv(self.source, metadata)
+    else:
+      with open(self.source, "rb") as b:
+        klv = b.read()
     self.klv_stream = BytesIO(klv)
 
     return self._parse()
-    
+
   def _parse(self):
     stream_end = self.klv_stream.seek(0, os.SEEK_END)
     self.klv_stream.seek(0, os.SEEK_SET)
@@ -97,7 +101,7 @@ class KLVParser(Parser):
           packet[self.element_dict[tag].misb_name] = self.element_dict[tag].fromMISB(value)
         else:
           packet[self.element_dict[tag].name] = self.element_dict[tag].fromMISB(value)
-      else: 
+      else:
         self.logger.warn("Parsed an unrecognized tag. Creating an UnknownElement")
         packet["Tag " + str(tag)] = UnknownElement(value)
 
@@ -129,4 +133,3 @@ class KLVParser(Parser):
 
     tag = (tag << 7) + (tag_byte)
     return tag
-    
